@@ -2,9 +2,10 @@ import { ActionIcon, Box, Button, Center, Flex, Grid } from "@mantine/core";
 import { useViewportSize } from "@mantine/hooks";
 import { IconPhoto, IconSettings, IconHeart, IconEdit, IconTrashX, IconEyeOff, IconAdjustments, IconPlus } from '@tabler/icons-react';
 import Clip from "./Clip";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { listen, UnlistenFn } from "@tauri-apps/api/event";
 import FastClip from "../Classes/FastClip";
+import { invoke } from "@tauri-apps/api/core";
 
 
 
@@ -12,20 +13,19 @@ import FastClip from "../Classes/FastClip";
 
 
 export default function ListOfClips() {
-
-    const clip = new FastClip("Hello World", "Greeting", "📌", 60);
-
-
-
-    const buttonLabels = [clip, clip];
-
     const { height } = useViewportSize();
+
+    const [clips, SetClips] = useState<Array<FastClip>>([])
+
 
 
     useEffect(() => {
         const unlistenPromises: Promise<UnlistenFn>[] = [];
 
-        unlistenPromises.push(listen('basler_update_get', (event) => {}));
+        unlistenPromises.push(listen('update_clips', (event) => {
+            console.log(event.payload);
+            SetClips(event.payload as Array<FastClip>);
+        }));
    
         return () => {
             // Unlisten to all events
@@ -36,7 +36,19 @@ export default function ListOfClips() {
     }, []);
 
 
-
+    useEffect(() => {
+        const initialize = async () => {
+          try {
+            const message = await invoke('get_clips');
+            SetClips(message as Array<FastClip>);
+          } catch (error) {
+            console.error(error); // Log the error if something goes wrong
+          }
+        };
+    
+        initialize(); // Call the async function inside useEffect
+      }, []); // Empty dependency array ensures it runs only on mount
+    
 
 
     return (
@@ -51,7 +63,7 @@ export default function ListOfClips() {
             style={{ height: `${height}px` }}
             p={10}
         >
-            {buttonLabels.map((clip, index) => (
+            {clips.map((clip, index) => (
                 <Clip key={index} fast_clip={clip} />
             ))}
 

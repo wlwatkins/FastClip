@@ -4,29 +4,37 @@ import { useDisclosure } from "@mantine/hooks";
 import { IconAt, IconClipboardCheckFilled, IconPlus, IconSend, IconTag } from '@tabler/icons-react';
 import FastClip from "../Classes/FastClip";
 import { invoke } from "@tauri-apps/api/core";
+import { useEffect } from "react";
 
 
+interface EditProps {
+    fast_clip: FastClip;
+    opened: boolean;
+    open: () => void;
+    close: () => void;
+}
 
-export default function New() {
-    const [opened, { open, close }] = useDisclosure(false);
+export default function Edit({ fast_clip, opened, open, close }: EditProps) {
+
 
     const form = useForm({
         mode: 'uncontrolled',
         initialValues: {
-            value: '',
-            label: '',
+            value: fast_clip.value,
+            label: fast_clip.label,
         }, validate: {
             value: hasLength({ min: 1 }, 'Must be at least 1 characters'),
             label: hasLength({ min: 3 }, 'Must be at least 3 characters'),
         },
-
     });
 
     const handleSubmit = (values: typeof form.values) => {
-        const clip = new FastClip(values.value, values.label, "📌");
-        console.log('Form submitted with:', clip);
+        fast_clip.value = values.value;
+        fast_clip.label = values.label;
+        
+        console.log('Form submitted with:', fast_clip);
 
-        invoke('new_clip', { clip })
+        invoke('update_clip', { fast_clip })
             .then((message) => console.log(message))
             .catch((error) => console.error(error));
         close();
@@ -39,7 +47,7 @@ export default function New() {
             <Modal
                 opened={opened}
                 onClose={close}
-                title="Add a new FastClip"
+                title="Edit a FastClip"
                 fullScreen
                 overlayProps={{
                     backgroundOpacity: 0.55,
@@ -84,11 +92,6 @@ export default function New() {
             </Modal>
 
 
-            <Box className='absolute  bottom-0 right-0'>
-                <ActionIcon variant="filled" color="green" aria-label="Add" radius="xl" size="xl" m={10} onClick={open}>
-                    <IconPlus style={{ width: '70%', height: '70%' }} stroke={1.5} />
-                </ActionIcon>
-            </Box>
 
         </>
     )
