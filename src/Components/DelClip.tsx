@@ -7,28 +7,18 @@ import FastClip from "../Classes/FastClip";
 
 
 
+interface ItemProps {
+    fast_clip: FastClip;
+  }
 
 
-export default function New() {
+  const Del: React.FC<ItemProps> = ({ fast_clip }) => {
+
     const [opened, { open, close }] = useDisclosure(true);
 
-    const form = useForm({
-        mode: 'uncontrolled',
-        initialValues: {
-            value: '',
-            label: '',
-        }, validate: {
-            value: hasLength({ min: 1 }, 'Must be at least 1 characters'),
-            label: hasLength({ min: 3 }, 'Must be at least 3 characters'),
-        },
 
-    });
-
-    const handleSubmit = (values: typeof form.values) => {
-        const clip = new FastClip(values.value, values.label, "📌", 60);
-        console.log('Form submitted with:', clip);
+    const handleSubmit = () => {
         close();
-        form.reset()
     };
 
     return (
@@ -48,26 +38,18 @@ export default function New() {
 
             >
 
-                <form onSubmit={form.onSubmit(handleSubmit)} >
 
 
-                    <TextInput
+     
 
-                        withAsterisk
-                        label="What do you want to paste?"
-                        placeholder="This will be pastable"
-                        key={form.key('value')}
-                        {...form.getInputProps('value')}
-                    />
-
-                    <TextInput
+                    {/* <TextInput
                         withAsterisk
                         mt={10}
                         label="Give it a label?"
                         placeholder="This will be displayed"
                         key={form.key('label')}
                         {...form.getInputProps('label')}
-                    />
+                    /> */}
 
 
 
@@ -78,12 +60,11 @@ export default function New() {
                     </Box>
 
 
-                </form>
             </Modal>
 
 
             <Box className='absolute  bottom-0 right-0'>
-                <ActionIcon variant="filled" color="green" aria-label="Add" radius="xl" size="xl" m={10} onClick={open}>
+                <ActionIcon variant="filled" color="red" aria-label="Add" radius="xl" size="xl" m={10} onClick={open}>
                     <IconPlus style={{ width: '70%', height: '70%' }} stroke={1.5} />
                 </ActionIcon>
             </Box>
@@ -92,3 +73,5 @@ export default function New() {
 
     )
 }
+
+export default Del;

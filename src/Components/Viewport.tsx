@@ -1,9 +1,10 @@
 import { ActionIcon, Box, Button, Center, Flex, Grid } from "@mantine/core";
 import { useViewportSize } from "@mantine/hooks";
 import { IconPhoto, IconSettings, IconHeart, IconEdit, IconTrashX, IconEyeOff, IconAdjustments, IconPlus } from '@tabler/icons-react';
-import Item from "./Clip";
+import Clip from "./Clip";
 import { useEffect } from "react";
 import { listen, UnlistenFn } from "@tauri-apps/api/event";
+import FastClip from "../Classes/FastClip";
 
 
 
@@ -12,13 +13,11 @@ import { listen, UnlistenFn } from "@tauri-apps/api/event";
 
 export default function ListOfClips() {
 
-    const [state, setState] = useSetState({
-        value: 'John',
-        icon: undefined,
-      });
+    const clip = new FastClip("Hello World", "Greeting", "📌", 60);
 
 
-    const buttonLabels = [state, 'Button 2', 'Button 3'];
+
+    const buttonLabels = [clip, clip];
 
     const { height } = useViewportSize();
 
@@ -26,7 +25,7 @@ export default function ListOfClips() {
     useEffect(() => {
         const unlistenPromises: Promise<UnlistenFn>[] = [];
 
-        unlistenPromises.push(listen('basler_update_get', (event) => setConnected(event.payload as boolean)));
+        unlistenPromises.push(listen('basler_update_get', (event) => {}));
    
         return () => {
             // Unlisten to all events
@@ -52,8 +51,8 @@ export default function ListOfClips() {
             style={{ height: `${height}px` }}
             p={10}
         >
-            {buttonLabels.map((label, index) => (
-                <Item key={index} label={label} />
+            {buttonLabels.map((clip, index) => (
+                <Clip key={index} fast_clip={clip} />
             ))}
 
 
