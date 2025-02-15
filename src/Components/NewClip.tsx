@@ -1,7 +1,7 @@
 import { ActionIcon, Box, Modal, TextInput } from "@mantine/core";
 import { hasLength, useForm } from "@mantine/form";
 import { useDisclosure } from "@mantine/hooks";
-import { IconAt, IconClipboardCheckFilled, IconPlus, IconSend, IconTag } from '@tabler/icons-react';
+import { IconClipboardCheckFilled, IconPlus, IconSend, IconTag } from '@tabler/icons-react';
 import FastClip from "../Classes/FastClip";
 import { invoke } from "@tauri-apps/api/core";
 
@@ -74,7 +74,7 @@ export default function New() {
 
 
                     <Box className='absolute  bottom-0 right-0'>
-                        <ActionIcon variant="filled" color="blue" aria-label="Add" radius="xl" size="xl" m={10} type="submit">
+                        <ActionIcon variant="filled" color="blue" aria-label="Add" size="xl" m={10} type="submit">
                             <IconSend style={{ width: '70%', height: '70%' }} stroke={1.5} />
                         </ActionIcon>
                     </Box>

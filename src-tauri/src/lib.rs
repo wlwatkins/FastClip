@@ -1,18 +1,15 @@
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 
 use anyhow::Result;
 use lazy_static::lazy_static;
 use tauri::AppHandle;
 use tokio::sync::Mutex;
-use uuid::Uuid;
-use crate::structures::Clip;
 use commands::{get_clips, new_clip, update_clip, del_clip};
 
 mod structures;
 mod commands;
 
 lazy_static! {
-    pub static ref DB: Arc<Mutex<HashMap<Uuid, Clip>>> = Arc::new(Mutex::new(HashMap::new()));
     pub static ref APP_HANDLE: Arc<Mutex<Option<AppHandle>>> = Arc::new(Mutex::new(None));
 }
 

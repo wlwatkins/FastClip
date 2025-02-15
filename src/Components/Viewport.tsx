@@ -1,6 +1,5 @@
-import { ActionIcon, Box, Button, Center, Flex, Grid } from "@mantine/core";
+import { Flex, ScrollArea } from "@mantine/core";
 import { useViewportSize } from "@mantine/hooks";
-import { IconPhoto, IconSettings, IconHeart, IconEdit, IconTrashX, IconEyeOff, IconAdjustments, IconPlus } from '@tabler/icons-react';
 import Clip from "./Clip";
 import { useEffect, useState } from "react";
 import { listen, UnlistenFn } from "@tauri-apps/api/event";
@@ -26,7 +25,7 @@ export default function ListOfClips() {
             console.log(event.payload);
             SetClips(event.payload as Array<FastClip>);
         }));
-   
+
         return () => {
             // Unlisten to all events
             unlistenPromises.forEach((unlistenPromise) => {
@@ -38,24 +37,23 @@ export default function ListOfClips() {
 
     useEffect(() => {
         const initialize = async () => {
-          try {
-            const message = await invoke('get_clips');
-            SetClips(message as Array<FastClip>);
-          } catch (error) {
-            console.error(error); // Log the error if something goes wrong
-          }
+            try {
+                const message = await invoke('get_clips');
+                SetClips(message as Array<FastClip>);
+            } catch (error) {
+                console.error(error); // Log the error if something goes wrong
+            }
         };
-    
+
         initialize(); // Call the async function inside useEffect
-      }, []); // Empty dependency array ensures it runs only on mount
-    
+    }, []); // Empty dependency array ensures it runs only on mount
+
 
 
     return (
 
         <Flex
             w="100%"
-
             maw="500px"
             gap="md"
             align="center"
@@ -63,10 +61,21 @@ export default function ListOfClips() {
             style={{ height: `${height}px` }}
             p={10}
         >
-            {clips.map((clip, index) => (
-                <Clip key={index} fast_clip={clip} />
-            ))}
-
+            <ScrollArea
+                h={height - 80}
+                p={0}
+                m={0}
+                w="100%">
+                <Flex
+                    align="center"
+                    gap={10}
+                    direction="column" p={0} m={0}
+                >
+                    {clips.map((clip, index) => (
+                        <Clip key={index} fast_clip={clip} />
+                    ))}
+                </Flex>
+            </ScrollArea>
 
         </Flex>
 
