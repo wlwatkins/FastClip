@@ -1,14 +1,17 @@
-import { ActionIcon, Box, Modal, TextInput } from "@mantine/core";
+import { ActionIcon, Box, Button, ColorPicker, Modal, Popover, TextInput } from "@mantine/core";
 import { hasLength, useForm } from "@mantine/form";
 import { useDisclosure } from "@mantine/hooks";
 import { IconClipboardCheckFilled, IconPlus, IconSend, IconTag } from '@tabler/icons-react';
 import FastClip from "../Classes/FastClip";
 import { invoke } from "@tauri-apps/api/core";
+import { useState } from "react";
 
 
 
 export default function New() {
     const [opened, { open, close }] = useDisclosure(false);
+    const [colour, onChangeColour] = useState('rgba(47, 119, 150, 0.7)');
+
 
     const form = useForm({
         mode: 'uncontrolled',
@@ -23,10 +26,11 @@ export default function New() {
     });
 
     const handleSubmit = (values: typeof form.values) => {
-        const clip = new FastClip(values.value, values.label, "📌");
+
+        const clip = new FastClip(values.value, values.label, "📌", colour);
         console.log('Form submitted with:', clip);
 
-        invoke('new_clip', { clip })
+        invoke('new_clip', { "clip": clip })
             .then((message) => console.log(message))
             .catch((error) => console.error(error));
         close();
@@ -70,6 +74,19 @@ export default function New() {
                         key={form.key('value')}
                         {...form.getInputProps('value')}
                     />
+
+                    
+    
+    
+                    <Popover  trapFocus position="bottom" withArrow shadow="md" >
+                        <Popover.Target>
+                            <Button autoContrast mt={10} fullWidth radius="xl" color={colour}>Select colour</Button>
+                        </Popover.Target>
+                        <Popover.Dropdown>
+                            <ColorPicker format="rgba" value={colour} onChange={onChangeColour} />
+                        </Popover.Dropdown>
+                    </Popover>
+    
 
 
 

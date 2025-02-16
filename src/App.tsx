@@ -4,14 +4,15 @@ import "./App.css";
 import "@mantine/core/styles.css"; 
 import '@mantine/notifications/styles.css';
 import New from "./Components/NewClip";
-import Settings from "./Components/SettingsClip";
+import ToolBar from "./Components/ToolBar";
 function App() {
 
   return (
     <Center className="bg-zinc-800">
+      <ToolBar/>
       <ListOfClips/>
       <New/>
-      <Settings/>
+      {/* <Settings/> */}
     </Center>
   );
 }

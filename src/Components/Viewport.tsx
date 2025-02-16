@@ -9,8 +9,6 @@ import { invoke } from "@tauri-apps/api/core";
 
 
 
-
-
 export default function ListOfClips() {
     const { height } = useViewportSize();
 
@@ -27,7 +25,6 @@ export default function ListOfClips() {
         }));
 
         return () => {
-            // Unlisten to all events
             unlistenPromises.forEach((unlistenPromise) => {
                 unlistenPromise.then((unlisten) => unlisten());
             });
@@ -50,6 +47,7 @@ export default function ListOfClips() {
 
 
 
+
     return (
 
         <Flex
@@ -60,6 +58,7 @@ export default function ListOfClips() {
             direction="column"
             style={{ height: `${height}px` }}
             p={10}
+            pt={50}
         >
             <ScrollArea
                 h={height - 80}
@@ -74,6 +73,7 @@ export default function ListOfClips() {
                     {clips.map((clip, index) => (
                         <Clip key={index} fast_clip={clip} />
                     ))}
+
                 </Flex>
             </ScrollArea>
 

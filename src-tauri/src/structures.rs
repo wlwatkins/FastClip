@@ -15,6 +15,7 @@ pub struct Clip {
     value: String,
     label: String,
     icon: String,
+    colour: String,
     visible: bool,
     clear_time: u64, // using u64 for clear_time, assuming it's a number like TypeScript's `number`
 }
@@ -70,12 +71,14 @@ impl DataBase {
 
     fn insert_or_update_clip(&mut self, clip: Clip) -> Result<()> {
         self.data.insert(clip.id, clip);
+        self.save()?;
         Ok(())
     }
     fn remove_clip(&mut self, clip_id: Uuid) -> Result<()> {
         self.data
             .remove(&clip_id)
             .ok_or_else(|| anyhow!("Clip ID '{}' not found", clip_id))?;
+        self.save()?;
 
         Ok(())
     }

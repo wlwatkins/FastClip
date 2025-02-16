@@ -15,7 +15,6 @@ pub async fn new_clip(clip: Clip) -> Result<(), Error> {
     Ok(())
 }
 
-
 #[command(rename_all = "snake_case")]
 pub async fn update_clip(clip: Clip) -> Result<(), Error> {
     println!("update_clip {:?}", clip);
@@ -33,21 +32,19 @@ pub async fn del_clip(clip_id: String) -> Result<(), Error> {
     Ok(())
 }
 
-
 #[command(rename_all = "snake_case")]
 pub async fn get_clips() -> Result<Vec<Clip>, Error> {
     let clips = get_clips_to_vec().await?;
     Ok(clips)
 }
 
-
-pub async fn update_frontend()  -> Result<(), Error> { // Handle the logic
+pub async fn update_frontend()  -> Result<(), Error> {
     let clips = get_clips_to_vec().await?;
     let handle_lock = APP_HANDLE.lock().await;
-    if let Some(app) = handle_lock.as_ref() {  // Correct `if let` syntax
-        app.emit("update_clips", clips)?;  // Use `emit`
+    match handle_lock.as_ref() {
+        Some(app) => app.emit("update_clips", clips)?,
+        None => eprintln!("App handle not lockable")
     }
 
     Ok(())
-    
 }

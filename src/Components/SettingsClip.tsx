@@ -1,37 +1,34 @@
-import { ActionIcon, Box, Drawer, Modal, TextInput } from "@mantine/core";
-import { hasLength, useForm } from "@mantine/form";
+import { ActionIcon, Box, Drawer } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
-import { IconAdjustments, IconAt, IconClipboardCheckFilled, IconPlus, IconSend, IconSettings, IconTag } from '@tabler/icons-react';
-import FastClip from "../Classes/FastClip";
-import { invoke } from "@tauri-apps/api/core";
+import { IconAdjustments } from '@tabler/icons-react';
 
 
 
 export default function Settings() {
     const [opened, { open, close }] = useDisclosure(false);
 
-    const form = useForm({
-        mode: 'uncontrolled',
-        initialValues: {
-            value: '',
-            label: '',
-        }, validate: {
-            value: hasLength({ min: 1 }, 'Must be at least 1 characters'),
-            label: hasLength({ min: 3 }, 'Must be at least 3 characters'),
-        },
+    // const form = useForm({
+    //     mode: 'uncontrolled',
+    //     initialValues: {
+    //         value: '',
+    //         label: '',
+    //     }, validate: {
+    //         value: hasLength({ min: 1 }, 'Must be at least 1 characters'),
+    //         label: hasLength({ min: 3 }, 'Must be at least 3 characters'),
+    //     },
 
-    });
+    // });
 
-    const handleSubmit = (values: typeof form.values) => {
-        const clip = new FastClip(values.value, values.label, "📌");
-        console.log('Form submitted with:', clip);
+    // const handleSubmit = (values: typeof form.values) => {
+    //     const clip = new FastClip(values.value, values.label, "📌");
+    //     console.log('Form submitted with:', clip);
 
-        invoke('new_clip', { clip })
-            .then((message) => console.log(message))
-            .catch((error) => console.error(error));
-        close();
-        form.reset()
-    };
+    //     invoke('new_clip', { clip })
+    //         .then((message) => console.log(message))
+    //         .catch((error) => console.error(error));
+    //     close();
+    //     form.reset()
+    // };
 
     return (
 

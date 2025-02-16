@@ -1,7 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "fast-clip",
-  "version": "0.1.0",
   "identifier": "com.fast-clip.app",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -12,10 +11,10 @@
   "app": {
     "windows": [
       {
-        "title": "fast-clip",
+        "title": "FastClip",
         "width": 300,
-        "height": 500,
-        "decorations": true,
+        "height": 600,
+        "decorations": false,
         "transparent": true
       }
     ],
