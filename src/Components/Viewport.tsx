@@ -51,7 +51,7 @@ export default function ListOfClips() {
     return (
 
         <Flex
-            w="100%"
+            w="95%"
             maw="500px"
             gap="md"
             align="center"
@@ -63,10 +63,10 @@ export default function ListOfClips() {
             <ScrollArea
                 h={height - 80}
                 p={0}
-                m={0}
+                m={0} scrollbars="y"
                 w="100%">
                 <Flex
-                    align="center"
+                    align="space-around"
                     gap={10}
                     direction="column" p={0} m={0}
                 >

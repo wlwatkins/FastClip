@@ -149,3 +149,6 @@ button {
     background-color: #0f0f0f69;
   }
 }
+html, body {
+  overflow: hidden;
+}

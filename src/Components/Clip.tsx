@@ -5,18 +5,19 @@ import FastClip from "../Classes/FastClip";
 import { useDisclosure } from "@mantine/hooks";
 import Edit from "./EditClip";
 import Delete from "./DeleteClip";
-import * as motion from "motion/react-client";
 import { useState, useEffect, useRef } from "react";
+import { useViewportSize } from "@mantine/hooks";
 
 interface ItemProps {
   fast_clip: FastClip;
 }
 
 const Clip: React.FC<ItemProps> = ({ fast_clip }) => {
+  const { width } = useViewportSize();
   const [editOpened, { open: openEdit, close: closeEdit }] = useDisclosure(false);
   const [deleteOpened, { open: openDelete, close: closeDelete }] = useDisclosure(false);
-  const [copied, setCopied] = useState(false);
-  const [truncatedLabel, setTruncatedLabel] = useState(fast_clip.label);
+  const [_copied, setCopied] = useState(false);
+  const [_truncatedLabel, setTruncatedLabel] = useState(fast_clip.label);
   const buttonRef = useRef<HTMLButtonElement>(null);
 
   // Function to measure text width and truncate accordingly
@@ -24,7 +25,7 @@ const Clip: React.FC<ItemProps> = ({ fast_clip }) => {
     const canvas = document.createElement("canvas");
     const context = canvas.getContext("2d");
     if (!context) return text;
-    
+
     context.font = font;
 
     const ellipsis = "...";
@@ -77,10 +78,39 @@ const Clip: React.FC<ItemProps> = ({ fast_clip }) => {
 
   return (
     <>
-      <Grid w="90%">
+      <Grid w="100%"  justify="center" align="center">
         <Grid.Col span="auto">
-          <motion.div>
-            <Tooltip label={fast_clip.value} position="bottom" color="gray">
+            <Tooltip withArrow multiline label={
+              <div style={{
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                width: '100%'
+              }}>
+                {fast_clip.value}
+              </div>
+            } position="bottom" color="gray" w={width * 0.90}>
+
+
+
+              {/* <motion.div
+                  style={{
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                    flex: 1,
+                  }}
+                  exit={{ opacity: 1 }}
+                  animate={{ opacity: copied ? 0 : 1 }}
+                  transition={{ duration: 1 }}
+                  key={copied ? 'copied' : fast_clip.label}
+                > */}
+
+              {/* </motion.div> */}
+
+
+
+
               <Button
                 ref={buttonRef} // Reference for measuring width
                 fullWidth
@@ -90,29 +120,25 @@ const Clip: React.FC<ItemProps> = ({ fast_clip }) => {
                 variant="filled"
                 color={fast_clip.colour}
                 radius="md"
+                size="xs"
                 onClick={handleCopy}
+                
               >
-                <motion.span
-                  exit={{ opacity: 1 }}
-                  animate={{ opacity: copied ? 0:1}}
-                  transition={{ duration: 1 }}
-                  key={copied ? "copied" : fast_clip.label}
-                >
-                  {copied ? "Copied!" : truncatedLabel}
-                </motion.span>
+                  {fast_clip.label}
               </Button>
+
+
             </Tooltip>
-          </motion.div>
         </Grid.Col>
 
         <Grid.Col span="content">
           <ActionIcon.Group>
-            <ActionIcon variant="light" size="lg" onClick={openEdit}>
-              <IconEdit size={20} stroke={1.5} />
+            <ActionIcon variant="light" size="sm" onClick={openEdit}>
+              <IconEdit size={15} stroke={1.5} />
             </ActionIcon>
 
-            <ActionIcon variant="light" color="red" size="lg" onClick={openDelete}>
-              <IconTrashX size={20} stroke={1.5} />
+            <ActionIcon variant="light" color="red" size="sm" onClick={openDelete}>
+              <IconTrashX size={15} stroke={1.5} />
             </ActionIcon>
           </ActionIcon.Group>
         </Grid.Col>

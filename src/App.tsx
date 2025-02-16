@@ -5,6 +5,7 @@ import "@mantine/core/styles.css";
 import '@mantine/notifications/styles.css';
 import New from "./Components/NewClip";
 import ToolBar from "./Components/ToolBar";
+import Settings from "./Components/SettingsClip";
 function App() {
 
   return (
@@ -12,7 +13,7 @@ function App() {
       <ToolBar/>
       <ListOfClips/>
       <New/>
-      {/* <Settings/> */}
+      <Settings/>
     </Center>
   );
 }

@@ -13,6 +13,7 @@
       {
         "title": "FastClip",
         "width": 300,
+        "minWidth": 250,
         "height": 600,
         "decorations": false,
         "transparent": true

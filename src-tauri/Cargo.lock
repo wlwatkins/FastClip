@@ -1634,7 +1634,7 @@ dependencies = [
 
 [[package]]
 name = "fast-clip"
-version = "0.1.0"
+version = "0.1.0-a"
 dependencies = [
  "anyhow",
  "dirs 6.0.0",

@@ -1,14 +1,14 @@
 {
   "name": "fast-clip",
   "private": true,
-  "version": "0.1.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
     "tauri": "tauri",
-    "tauri dev": "tauri dev"
+    "tauri dev": "tauri dev",
+    "release": "tauri build"
   },
   "dependencies": {
     "@dnd-kit/sortable": "^10.0.0",

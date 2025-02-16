@@ -1,4 +1,4 @@
-import { ActionIcon, Box, Button, ColorPicker, Modal, Popover, TextInput } from "@mantine/core";
+import { ActionIcon, Box, Button, ColorPicker, Modal, Popover, Textarea, TextInput } from "@mantine/core";
 import { hasLength, useForm } from "@mantine/form";
 import { useDisclosure } from "@mantine/hooks";
 import { IconClipboardCheckFilled, IconPlus, IconSend, IconTag } from '@tabler/icons-react';
@@ -54,8 +54,8 @@ export default function New() {
 
                 <form onSubmit={form.onSubmit(handleSubmit)} >
 
-                <TextInput
-                            leftSection={<IconTag size={16} />}
+                    <TextInput
+                        leftSection={<IconTag size={16} />}
 
                         withAsterisk
                         mt={10}
@@ -66,19 +66,21 @@ export default function New() {
                     />
 
 
-                    <TextInput
+                    <Textarea
+                        mt={10}
                         leftSection={<IconClipboardCheckFilled size={16} />}
                         withAsterisk
                         label="What do you want to paste?"
+                        resize="vertical"
                         placeholder="This will be pastable"
                         key={form.key('value')}
                         {...form.getInputProps('value')}
                     />
 
-                    
-    
-    
-                    <Popover  trapFocus position="bottom" withArrow shadow="md" >
+
+
+
+                    <Popover trapFocus position="bottom" withArrow shadow="md" >
                         <Popover.Target>
                             <Button autoContrast mt={10} fullWidth radius="xl" color={colour}>Select colour</Button>
                         </Popover.Target>
@@ -86,7 +88,7 @@ export default function New() {
                             <ColorPicker format="rgba" value={colour} onChange={onChangeColour} />
                         </Popover.Dropdown>
                     </Popover>
-    
+
 
 
 
