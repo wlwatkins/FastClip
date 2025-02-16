@@ -68,6 +68,20 @@ The project is built with Tauri and React. The CSS framework used is [Mantine](h
    npm run tauri dev
    ```
 
+## Todo
+
+- [ ] Add a tray icon with right-click copy functionality.
+- [ ] Encrypt the database.
+- [ ] Switch to SurrealDB.
+- [ ] Improve the UI with better animations.
+- [ ] Add file copy functionality.
+- [ ] Implement keyboard shortcuts for quick macro activation.
+- [ ] Support multiple clipboard entries with history.
+- [ ] Cloud synchronization for macros across devices.
+- [ ] Export and import macros as JSON files.
+- [ ] Fix UI when editing label delete window not updated
+
+
 ## Contributing
 
 This is an early proof of concept. I think the app could benefit from nice CSS animations to make it more intuitive.
