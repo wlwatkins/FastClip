@@ -8,7 +8,7 @@ import { getVersion } from "@tauri-apps/api/app";
 
 
 export default function Settings() {
-    const [opened, { open, close }] = useDisclosure(true);
+    const [opened, { open, close }] = useDisclosure(false);
     const [alwaysOnTop, setAlwaysOnTop] = useState(false);
     const [version, setVersion] = useState("");
 
