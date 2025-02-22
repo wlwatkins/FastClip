@@ -29,9 +29,10 @@ pub fn setup_tray(app: &AppHandle) -> Result<()> {
         })
         .on_tray_icon_event(|tray, event| {
             if let TrayIconEvent::DoubleClick {
-                    button: MouseButton::Left,
-                    ..
-                } = event {
+                button: MouseButton::Left,
+                ..
+            } = event
+            {
                 let app = tray.app_handle();
                 if let Some(window) = app.get_webview_window("main") {
                     let _ = window.show();

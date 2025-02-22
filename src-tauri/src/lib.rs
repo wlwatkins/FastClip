@@ -17,13 +17,7 @@ mod tray;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub async fn run() -> Result<()> {
-    let builder = tauri::Builder::default()
-        .plugin(tauri_plugin_autostart::init(
-            MacosLauncher::LaunchAgent,
-            None,
-        ))
-        .plugin(tauri_plugin_notification::init())
-        .plugin(tauri_plugin_dialog::init());
+    let builder = tauri::Builder::default();
     // #[cfg(desktop)]
     // {
     //     builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args,
@@ -34,13 +28,19 @@ pub async fn run() -> Result<()> {
     // }
 
     builder
+        .plugin(tauri_plugin_persisted_scope::init())
+        .plugin(tauri_plugin_autostart::init(
+            MacosLauncher::LaunchAgent,
+            None,
+        ))
+        .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_log::Builder::new().build())
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             app.manage(Mutex::new(DataBase::new()));
             setup_tray(app.handle())?;
-
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

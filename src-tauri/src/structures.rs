@@ -57,7 +57,7 @@ impl DataBase {
         fs::write(&path, json)?;
         Ok(())
     }
-    
+
     pub fn from_path<P: AsRef<Path>>(path: P) -> Result<Self> {
         let json = fs::read_to_string(&path)?;
         let db: Self = serde_json::from_str(&json)?;
