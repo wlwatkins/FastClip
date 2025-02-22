@@ -1,4 +1,5 @@
 use anyhow::Result;
+use log::debug;
 use tauri::menu::Menu;
 use tauri::menu::MenuItem;
 use tauri::tray::MouseButton;
@@ -20,11 +21,10 @@ pub fn setup_tray(app: &AppHandle) -> Result<()> {
         .on_menu_event(|app, event| {
             match event.id.0.as_str() {
                 "quit" => {
-                    println!("Quit menu item clicked");
                     app.exit(0);
                 }
                 _ => {
-                    println!("Unhandled menu item: {:?}", event.id);
+                    debug!("Unhandled menu item: {:?}", event.id);
                 }
             }
         })
@@ -35,7 +35,6 @@ pub fn setup_tray(app: &AppHandle) -> Result<()> {
                     button_state: MouseButtonState::Up,
                     ..
                 } => {
-                    println!("Tray icon left-clicked");
                     let app = tray.app_handle();
                     if let Some(window) = app.get_webview_window("main") {
                         let _ = window.show();
@@ -56,16 +55,14 @@ pub fn setup_tray(app: &AppHandle) -> Result<()> {
                 api, ..
             } = event
             {
-                println!("Main window close requested, hiding instead of closing.");
                 api.prevent_close(); // Prevents the app from quitting
                 let main_window = app_handle.get_webview_window("main").unwrap();
                 let _ = main_window.hide();
-                app_handle.notification()
+                let _ = app_handle.notification()
                 .builder()
                 .title("FastClip")
                 .body("FastClip is still running in your system tray. Double click to show window.")
-                .show()
-                .unwrap();
+                .show();
             }
         });
     }
