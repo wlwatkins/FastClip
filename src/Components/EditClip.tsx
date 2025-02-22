@@ -4,6 +4,7 @@ import { IconClipboardCheckFilled, IconDeviceFloppy, IconTag } from '@tabler/ico
 import FastClip from "../Classes/FastClip";
 import { invoke } from "@tauri-apps/api/core";
 import { useState } from "react";
+import { info } from '@tauri-apps/plugin-log';
 
 
 interface EditProps {
@@ -41,8 +42,8 @@ export default function Edit({ fastClipRef, opened, close }: EditProps) {
         });
 
         invoke('update_clip', {"clip": fastClipRef})
-            .then((message) => console.log(message))
-            .catch((error) => console.error(error));
+            .then((message: any) => info(message))
+            .catch((error) => error(error));
         close();
         form.reset()
     };
@@ -103,10 +104,12 @@ export default function Edit({ fastClipRef, opened, close }: EditProps) {
                     mt={10} 
                     label="Colour"
                     swatchesPerRow={12}
+                    disallowInput
                     format="hex"
                     onChange={onChangeColour}
                     defaultValue={colour}
-                    swatches={['#2e2e2e', '#868e96', '#fa5252', '#e64980', '#be4bdb', '#7950f2', '#4c6ef5', '#228be6', '#15aabf', '#12b886', '#40c057', '#82c91e', '#fab005', '#fd7e14']}
+                    withPicker={false}
+                    swatches={['#000814', '#001D3D', '#003566', '#FFC300', '#FFD60A']}
                 />
 
 

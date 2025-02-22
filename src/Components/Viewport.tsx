@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { listen, UnlistenFn } from "@tauri-apps/api/event";
 import FastClip from "../Classes/FastClip";
 import { invoke } from "@tauri-apps/api/core";
+import { debug } from '@tauri-apps/plugin-log';
 
 
 
@@ -20,7 +21,7 @@ export default function ListOfClips() {
         const unlistenPromises: Promise<UnlistenFn>[] = [];
 
         unlistenPromises.push(listen('update_clips', (event) => {
-            console.log(event.payload);
+            debug(event.payload as string);
             SetClips(event.payload as Array<FastClip>);
         }));
 

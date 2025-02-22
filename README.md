@@ -70,7 +70,8 @@ The project is built with Tauri and React. The CSS framework used is [Mantine](h
 
 ## Todo
 
-- [ ] Add a tray icon with right-click copy functionality.
+- [X] Add a tray icon with right-click copy functionality.
+- [ ] Make program single instance.
 - [ ] Encrypt the database.
 - [ ] Switch to SurrealDB.
 - [ ] Improve the UI with better animations.

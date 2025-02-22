@@ -5,6 +5,7 @@ import { IconClipboardCheckFilled, IconPlus, IconSend, IconTag } from '@tabler/i
 import FastClip from "../Classes/FastClip";
 import { invoke } from "@tauri-apps/api/core";
 import { useState } from "react";
+import { debug, info } from '@tauri-apps/plugin-log';
 
 
 
@@ -28,11 +29,12 @@ export default function New() {
     const handleSubmit = (values: typeof form.values) => {
 
         const clip = new FastClip(values.value, values.label, "📌", colour);
-        console.log('Form submitted with:', clip);
+        debug(`Form submitted with: ${clip}`);
+
 
         invoke('new_clip', { "clip": clip })
-            .then((message) => console.log(message))
-            .catch((error) => console.error(error));
+            .then((message: any) => info(message))
+            .catch((error) => error(error));
         close();
         form.reset()
     };
@@ -85,7 +87,15 @@ export default function New() {
                             <Button autoContrast mt={10} fullWidth radius="xl" color={colour}>Select colour</Button>
                         </Popover.Target>
                         <Popover.Dropdown>
-                            <ColorPicker format="rgba" value={colour} onChange={onChangeColour} />
+                               <ColorPicker
+                                                mt={10} 
+                                                swatchesPerRow={12}
+                                                format="hex"
+                                                onChange={onChangeColour}
+                                                defaultValue={colour}
+                                                withPicker={false}
+                                                swatches={['#000814', '#001D3D', '#003566', '#FFC300', '#FFD60A']}
+                                            />
                         </Popover.Dropdown>
                     </Popover>
 

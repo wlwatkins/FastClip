@@ -1,19 +1,23 @@
 use anyhow::anyhow;
 use anyhow::Result;
 
-use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, fs, path::PathBuf};
+use serde::Deserialize;
+use serde::Serialize;
+use std::collections::HashMap;
+use std::fs;
+use std::path::Path;
+use std::path::PathBuf;
 
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Clip {
-    pub id: Uuid,
-    value: String,
-    label: String,
-    icon: String,
-    colour: String,
-    visible: bool,
+    pub id:     Uuid,
+    value:      String,
+    label:      String,
+    icon:       String,
+    colour:     String,
+    visible:    bool,
     clear_time: u64,
 }
 
@@ -45,7 +49,14 @@ impl DataBase {
         db
     }
 
-    /// Saves the current instance of `AppData` to disk using JSON serialization.
+    pub fn from_path<P: AsRef<Path>>(path: P) -> Result<Self> {
+        let json = fs::read_to_string(&path)?;
+        let db: Self = serde_json::from_str(&json)?;
+        Ok(db)
+    }
+
+    /// Saves the current instance of `AppData` to disk using JSON
+    /// serialization.
     pub fn save(&self) -> Result<()> {
         let json = serde_json::to_string_pretty(self)?;
         fs::write(&self.path, json)?;
@@ -59,17 +70,24 @@ impl DataBase {
         self.data = db.data;
         Ok(())
     }
+
     pub fn to_vec(&self) -> Result<Vec<Clip>> {
         let clips: Vec<Clip> = self.data.iter().map(|(_, item)| item.clone()).collect();
         Ok(clips)
     }
 
-    pub fn insert_or_update_clip(&mut self, clip: Clip) -> Result<()> {
+    pub fn insert_or_update_clip(
+        &mut self,
+        clip: Clip,
+    ) -> Result<()> {
         self.data.insert(clip.id, clip);
         self.save()?;
         Ok(())
     }
-    pub fn remove_clip(&mut self, clip_id: Uuid) -> Result<()> {
+    pub fn remove_clip(
+        &mut self,
+        clip_id: Uuid,
+    ) -> Result<()> {
         self.data
             .remove(&clip_id)
             .ok_or_else(|| anyhow!("Clip ID '{}' not found", clip_id))?;

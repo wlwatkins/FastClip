@@ -1,55 +1,80 @@
-import { ActionIcon, Box, Checkbox, Drawer } from "@mantine/core";
+import { ActionIcon, Box, Button, Drawer, Stack, Switch } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
 import { IconAdjustments } from '@tabler/icons-react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { useEffect, useState } from "react";
 import { getVersion } from "@tauri-apps/api/app";
-
-
+import { save } from '@tauri-apps/plugin-dialog';
+import { debug } from "@tauri-apps/plugin-log";
+import { open as load_file  } from '@tauri-apps/plugin-dialog';
+import { invoke } from "@tauri-apps/api/core";
 
 export default function Settings() {
-    const [opened, { open, close }] = useDisclosure(false);
+    const [opened, { open, close }] = useDisclosure(true);
     const [alwaysOnTop, setAlwaysOnTop] = useState(false);
     const [version, setVersion] = useState("");
 
     useEffect(() => {
-      getVersion().then(setVersion);
+        getVersion().then(setVersion);
     }, []);
 
-    // const form = useForm({
-    //     mode: 'uncontrolled',
-    //     initialValues: {
-    //         value: '',
-    //         label: '',
-    //     }, validate: {
-    //         value: hasLength({ min: 1 }, 'Must be at least 1 characters'),
-    //         label: hasLength({ min: 3 }, 'Must be at least 3 characters'),
-    //     },
-
-    // });
 
 
     const handleAlwaysOnTop = async () => {
         const newValue = !alwaysOnTop;
-        setAlwaysOnTop(newValue); 
-        console.log(newValue);
-        console.log(alwaysOnTop);
+        setAlwaysOnTop(newValue);
         await getCurrentWindow().setAlwaysOnTop(newValue);
     };
+
+    
+    const handleLoad = async () => {
+        const file = await load_file({
+            multiple: false,
+            directory: false,
+            filters: [
+                {
+                  name: 'FastClip database',
+                  extensions: ['csv'],
+                },
+                {
+                  name: 'Any files',
+                  extensions: ['*'],
+                },
+              ],
+          });
+          if (file) {
+            invoke('load', {file})
+                .catch((error) => error(error));
+          }
+
+    };
+
+
     return (
 
         <>
             <Drawer opened={opened} onClose={close} title="Settings">
-                <Checkbox
-                    checked={alwaysOnTop}
-                    onChange={handleAlwaysOnTop}
-                    label="Keep on top"
-                />
 
+                <Stack
+                    align="stretch" justify="flex-start"
+                    gap="md"
+                >
+
+                    <Switch
+                        checked={alwaysOnTop}
+                        labelPosition="left"
+                        onChange={handleAlwaysOnTop}
+                        label="Keep on top"
+                    />
+                        <Button.Group >
+                            <Button variant="filled" size="xs" fullWidth onClick={handleLoad}>Load</Button>
+                            <Button variant="filled" color="green" size="xs" fullWidth>Export</Button>
+                        </Button.Group>
+                </Stack>
 
 
                 <Box className='absolute  bottom-0 right-0'>
-                   <p className="pr-2 text-gray-500">v{version}</p>     
+                    <p className="pr-2 text-gray-500">v{version}</p>
                 </Box>
 
             </Drawer>

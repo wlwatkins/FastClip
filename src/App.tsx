@@ -10,7 +10,7 @@ function App() {
 
 
   return (
-    <Center className="bg-zinc-800">
+    <Center  className="bg-zinc-800">
       <ToolBar/>
       <ListOfClips/>
       <New/>

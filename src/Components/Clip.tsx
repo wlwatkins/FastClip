@@ -7,6 +7,7 @@ import Edit from "./EditClip";
 import Delete from "./DeleteClip";
 import { useState, useEffect, useRef } from "react";
 import { useViewportSize } from "@mantine/hooks";
+import { info } from '@tauri-apps/plugin-log';
 
 interface ItemProps {
   fast_clip: FastClip;
@@ -38,10 +39,10 @@ const Clip: React.FC<ItemProps> = ({ fast_clip }) => {
   const handlePutInClipBoard = () => {
     writeText(fastClipRef.current.value)
       .then(() => {
-        console.log("Text written successfully");
+        info("Text written successfully");
       })
       .catch((error) => {
-        console.error("Error writing text:", error);
+        error("Error writing text:", error);
       });
   };
 
