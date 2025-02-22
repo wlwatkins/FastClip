@@ -7,7 +7,6 @@ import { invoke } from "@tauri-apps/api/core";
 import { useState } from "react";
 
 
-
 export default function New() {
     const [opened, { open, close }] = useDisclosure(false);
     const [colour, onChangeColour] = useState('#000814');

@@ -1,18 +1,19 @@
-import { Flex, ScrollArea } from "@mantine/core";
+import { Button, Flex, ScrollArea } from "@mantine/core";
 import { useViewportSize } from "@mantine/hooks";
 import Clip from "./Clip";
 import { useEffect, useState } from "react";
 import { listen, UnlistenFn } from "@tauri-apps/api/event";
 import FastClip from "../Classes/FastClip";
 import { invoke } from "@tauri-apps/api/core";
-
+import New from "./NewClip";
+import Settings from "./SettingsClip";
+import { IconArrowBigDown, IconBrandMantine, IconPlus } from "@tabler/icons-react";
+import { Text } from '@mantine/core';
 
 export default function ListOfClips() {
     const { height } = useViewportSize();
 
     const [clips, SetClips] = useState<Array<FastClip>>([])
-
-
 
     useEffect(() => {
         const unlistenPromises: Promise<UnlistenFn>[] = [];
@@ -51,36 +52,68 @@ export default function ListOfClips() {
 
     return (
 
-        <Flex
-            w="95%"
-            maw="500px"
-            gap="md"
-            align="center"
-            direction="column"
-            style={{ height: `${height}px` }}
-            p={10}
-            pt={50}
-        >
-            <ScrollArea
-                h={height - 80}
-                p={0}
-                m={0} scrollbars="y"
-                w="100%">
+        <>
+
+            {clips.length === 0 ? (
                 <Flex
-                    align="space-around"
-                    gap={10}
-                    direction="column" p={0} m={0}
+                    w="95%"
+                    maw="500px"
+                    gap="md"
+                    align="center"
+                    justify="center"
+                    direction="column"
+                    style={{ height: `${height}px` }}
+                    p={10}
                 >
-                    {clips.map((clip) => (
-                        <Clip key={clip.id} fast_clip={clip} /> // Assuming `clip.id` is unique
-                    ))}
 
 
+                    <Text c="dimmed">Create your first clip +</Text>
+                     <IconArrowBigDown
+                          size={60}
+                          stroke={1}
+                          color="var(--mantine-color-gray-filled)"
+                        />
                 </Flex>
-            </ScrollArea>
+            ) : (
+                <Flex
+                    w="95%"
+                    maw="500px"
+                    gap="md"
+                    align="center"
+                    direction="column"
+                    style={{ height: `${height}px` }}
+                    p={10}
+                    pt={50}
+                >
 
-          
-        </Flex>
+                    <ScrollArea
+                        h={height - 80}
+                        p={0}
+                        m={0} scrollbars="y"
+                        w="100%">
+                        <Flex
+                            align="space-around"
+                            gap={10}
+                            direction="column" p={0} m={0}
+                        >
+                            {clips.map((clip) => (
+                                <Clip key={clip.id} fast_clip={clip} /> // Assuming `clip.id` is unique
+                            ))}
+                        </Flex>
+                    </ScrollArea>
+                </Flex>
+            )}
+            <New />
+            <Settings />
+        </>
 
     )
 }
+function useDisclosure(arg0: boolean): [any, { open: any; close: any; }] {
+    throw new Error("Function not implemented.");
+}
+
+function useRef(arg0: { open: any; close: any; }) {
+    throw new Error("Function not implemented.");
+}
+
