@@ -5,6 +5,7 @@ use commands::load;
 use commands::new_clip;
 use commands::save;
 use commands::update_clip;
+use commands::delay_clear_clipboard;
 use structures::DataBase;
 use tauri::Manager;
 use tauri_plugin_autostart::MacosLauncher;
@@ -49,7 +50,8 @@ pub async fn run() -> Result<()> {
             get_clips,
             del_clip,
             load,
-            save
+            save,
+            delay_clear_clipboard
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

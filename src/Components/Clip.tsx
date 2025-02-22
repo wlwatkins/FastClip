@@ -7,6 +7,7 @@ import Edit from "./EditClip";
 import Delete from "./DeleteClip";
 import { useState, useEffect, useRef } from "react";
 import { useViewportSize } from "@mantine/hooks";
+import { invoke } from "@tauri-apps/api/core";
 
 interface ItemProps {
   fast_clip: FastClip;
@@ -21,21 +22,8 @@ const Clip: React.FC<ItemProps> = ({ fast_clip }) => {
   const [_copied, setCopied] = useState(false);
   const [_truncatedLabel, setTruncatedLabel] = useState(fastClipRef.current.label);
   const buttonRef = useRef<HTMLButtonElement>(null);
-  const [timeoutId, setTimeoutId] = useState<number | null>(null);
 
 
-  const clearClipboardAfter = (seconds: number) => {
-    if (timeoutId !== null) {
-      clearTimeout(timeoutId);
-    }
-
-    const newTimeoutId = setTimeout(() => {
-      navigator.clipboard.writeText(''); // Clear clipboard
-      console.log('Clipboard cleared after', seconds, 'seconds');
-      setTimeoutId(null); // Reset timeoutId after execution
-    }, seconds * 1000);
-    setTimeoutId(newTimeoutId);
-  };
 
   useEffect(() => {
     const buttonElement = buttonRef.current;
@@ -56,7 +44,8 @@ const Clip: React.FC<ItemProps> = ({ fast_clip }) => {
         console.log("Text written successfully");
 
         if (fastClipRef.current.clear_time) {
-          clearClipboardAfter(fastClipRef.current.clear_time);
+          invoke('delay_clear_clipboard', {"delay": fastClipRef.current.clear_time})
+            .catch((error) => console.error(error));
         }
 
       })

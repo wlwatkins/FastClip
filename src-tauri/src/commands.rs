@@ -1,13 +1,16 @@
 use std::path::PathBuf;
+use std::time::Duration;
 
 use crate::structures::Clip;
 use crate::structures::DataBase;
 use anyhow::anyhow;
 use anyhow::Result;
+use log::debug;
 use tauri::command;
 use tauri::Emitter;
 use tauri::Error;
 use tauri::State;
+use tauri_plugin_clipboard_manager::ClipboardExt;
 use tokio::sync::Mutex;
 use uuid::Uuid;
 
@@ -79,5 +82,23 @@ pub async fn save(
     let db = state.lock().await;
     db.to_path(file)?;
     app_handle.emit("update_clips", db.to_vec()?)?;
+    Ok(())
+}
+
+
+#[command(rename_all = "snake_case")]
+pub async fn delay_clear_clipboard(
+    app_handle: tauri::AppHandle,
+    delay: u64,
+) -> Result<(), Error> {
+    let app_clone = app_handle.clone();
+    debug!("Starting thread for clearing clipboard in {delay}s");
+    tokio::spawn(async move {
+        tokio::time::sleep(Duration::from_secs(delay)).await;
+        debug!("Clearing clipboard");
+        app_clone.clipboard().write_text("".to_string()).expect("Could not clear clipboard");
+    });
+
+    
     Ok(())
 }
