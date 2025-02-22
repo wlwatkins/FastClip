@@ -44,7 +44,7 @@ const Clip: React.FC<ItemProps> = ({ fast_clip }) => {
         console.log("Text written successfully");
 
         if (fastClipRef.current.clear_time) {
-          invoke('delay_clear_clipboard', {"delay": fastClipRef.current.clear_time})
+          invoke('delay_clear_clipboard', { "delay": fastClipRef.current.clear_time })
             .catch((error) => console.error(error));
         }
 
