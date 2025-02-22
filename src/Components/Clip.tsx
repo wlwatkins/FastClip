@@ -8,6 +8,7 @@ import Delete from "./DeleteClip";
 import { useState, useEffect, useRef } from "react";
 import { useViewportSize } from "@mantine/hooks";
 import { invoke } from "@tauri-apps/api/core";
+import { notifications } from "@mantine/notifications";
 
 interface ItemProps {
   fast_clip: FastClip;
@@ -39,6 +40,16 @@ const Clip: React.FC<ItemProps> = ({ fast_clip }) => {
   }, [fastClipRef.current.label]);
 
   const handlePutInClipBoard = () => {
+
+    notifications.show({
+      title: `Copied '${fastClipRef.current.label}' to clipboard`,
+      message: undefined,
+      withCloseButton: false,
+      // color: "lime",
+      radius: "xs",
+      position: "bottom-center"
+    });
+
     writeText(fastClipRef.current.value)
       .then(() => {
         console.log("Text written successfully");

@@ -21,7 +21,6 @@ export default function Settings() {
         // Check if the app should start on boot
         const fetchStartOnBoot = async () => {
             const isAppEnabled = await isEnabled();
-            console.log(isAppEnabled);
             setStartOnBoot(isAppEnabled);
         };
 

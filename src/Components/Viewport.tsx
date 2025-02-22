@@ -1,13 +1,12 @@
-import { Flex, ScrollArea } from "@mantine/core";
+import { Button, Flex, ScrollArea } from "@mantine/core";
 import { useViewportSize } from "@mantine/hooks";
 import Clip from "./Clip";
 import { useEffect, useState } from "react";
 import { listen, UnlistenFn } from "@tauri-apps/api/event";
 import FastClip from "../Classes/FastClip";
 import { invoke } from "@tauri-apps/api/core";
+import { notifications } from '@mantine/notifications';
 
-
-import '@mantine/notifications/styles.css';
 
 export default function ListOfClips() {
     const { height } = useViewportSize();
@@ -35,13 +34,13 @@ export default function ListOfClips() {
     useEffect(() => {
         const initialize = async () => {
             invoke('get_clips')
-            .then((message) => {
-                console.log(message);
-                SetClips(message as Array<FastClip>);
-            })
-            .catch((error) => {
-                console.error(error);
-            });
+                .then((message) => {
+                    console.log(message);
+                    SetClips(message as Array<FastClip>);
+                })
+                .catch((error) => {
+                    console.error(error);
+                });
 
         };
 
@@ -74,14 +73,14 @@ export default function ListOfClips() {
                     direction="column" p={0} m={0}
                 >
                     {clips.map((clip) => (
-                    <Clip key={clip.id} fast_clip={clip} /> // Assuming `clip.id` is unique
-                ))}
+                        <Clip key={clip.id} fast_clip={clip} /> // Assuming `clip.id` is unique
+                    ))}
 
 
                 </Flex>
             </ScrollArea>
 
-
+          
         </Flex>
 
     )
