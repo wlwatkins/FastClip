@@ -5,19 +5,19 @@ import { invoke } from "@tauri-apps/api/core";
 
 
 interface DeleteProps {
-    fast_clip: FastClip;
+    fastClipRef: React.MutableRefObject<FastClip>;
     opened: boolean;
     open: () => void;
     close: () => void;
 }
 
-export default function Delete({ fast_clip, opened, close }: DeleteProps) {
+export default function Delete({ fastClipRef, opened, close }: DeleteProps) {
 
     const form = useForm({
         mode: 'uncontrolled',
         initialValues: {
-            value: fast_clip.value,
-            label: fast_clip.label,
+            value: fastClipRef.current.value,
+            label: fastClipRef.current.label,
         }, validate: {
             value: hasLength({ min: 1 }, 'Must be at least 1 characters'),
             label: hasLength({ min: 3 }, 'Must be at least 3 characters'),
@@ -25,7 +25,7 @@ export default function Delete({ fast_clip, opened, close }: DeleteProps) {
     });
 
     const handleDelClip = () => {
-        invoke('del_clip', { "clip_id": fast_clip.id })
+        invoke('del_clip', { "clip_id": fastClipRef.current.id })
             .then((message) => console.log(message))
             .catch((error) => console.error(error));
         close();
@@ -36,7 +36,7 @@ export default function Delete({ fast_clip, opened, close }: DeleteProps) {
             <Modal
                 opened={opened}
                 onClose={close}
-                title={`Are you sure you want to delete "${fast_clip.label}" ?`}
+                title={`Are you sure you want to delete "${fastClipRef.current.label}" ?`}
                 centered
                 withCloseButton={false}
                 overlayProps={{

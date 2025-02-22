@@ -8,6 +8,7 @@ import ToolBar from "./Components/ToolBar";
 import Settings from "./Components/SettingsClip";
 function App() {
 
+
   return (
     <Center className="bg-zinc-800">
       <ToolBar/>

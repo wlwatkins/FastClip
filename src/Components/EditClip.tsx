@@ -7,22 +7,21 @@ import { useState } from "react";
 
 
 interface EditProps {
-    fast_clip: FastClip;
-
+    fastClipRef: React.MutableRefObject<FastClip>;
     opened: boolean;
     open: () => void;
     close: () => void;
 }
 
-export default function Edit({ fast_clip, opened, close }: EditProps) {
-    const [clip, setClip] = useState(fast_clip);
+export default function Edit({ fastClipRef, opened, close }: EditProps) {
+    const [clip, setClip] = useState(fastClipRef);
     const [colour, onChangeColour] = useState('rgba(47, 119, 150, 0.7)');
 
     const form = useForm({
         mode: 'controlled',
         initialValues: {
-            value: clip.value,
-            label: clip.label,
+            value: clip.current.value,
+            label: clip.current.label,
         }, validate: {
             value: hasLength({ min: 1 }, 'Must be at least 1 characters'),
             label: hasLength({ min: 3 }, 'Must be at least 3 characters'),
@@ -31,17 +30,17 @@ export default function Edit({ fast_clip, opened, close }: EditProps) {
 
     const handleSubmit = (values: typeof form.values) => {
 
-        fast_clip.value = values.value;
-        fast_clip.label = values.label;
-        fast_clip.colour = colour;
-        setClip(fast_clip);
+        fastClipRef.current.value = values.value;
+        fastClipRef.current.label = values.label;
+        fastClipRef.current.colour = colour;
+        setClip(fastClipRef);
 
         form.setInitialValues({
-          value: fast_clip.value,
-          label: fast_clip.label,
+          value: fastClipRef.current.value,
+          label: fastClipRef.current.label,
         });
 
-        invoke('update_clip', {"clip": fast_clip})
+        invoke('update_clip', {"clip": fastClipRef})
             .then((message) => console.log(message))
             .catch((error) => console.error(error));
         close();

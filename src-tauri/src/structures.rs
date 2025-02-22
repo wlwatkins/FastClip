@@ -1,13 +1,10 @@
 use anyhow::anyhow;
 use anyhow::Result;
-use lazy_static::lazy_static;
+
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, fs, path::PathBuf, sync::Arc};
-use tokio::sync::Mutex;
+use std::{collections::HashMap, fs, path::PathBuf};
+
 use uuid::Uuid;
-// lazy_static! {
-//     static ref DB: Arc<Mutex<DataBase>> = Arc::new(Mutex::new(DataBase::new()));
-// }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Clip {
@@ -17,7 +14,7 @@ pub struct Clip {
     icon: String,
     colour: String,
     visible: bool,
-    clear_time: u64, // using u64 for clear_time, assuming it's a number like TypeScript's `number`
+    clear_time: u64,
 }
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]

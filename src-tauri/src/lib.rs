@@ -3,9 +3,11 @@ use commands::{del_clip, get_clips, new_clip, update_clip};
 use structures::DataBase;
 use tauri::{AppHandle, Manager};
 use tokio::sync::Mutex;
+use tray::setup_tray;
 
 mod commands;
 mod structures;
+mod tray;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub async fn run() -> Result<()> {
@@ -25,6 +27,7 @@ pub async fn run() -> Result<()> {
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             app.manage(Mutex::new(DataBase::new()));
+            setup_tray(app.handle())?;
             // let app_handle = app.handle().clone(); // Clone `AppHandle` before moving it
             // let global_handle = APP_HANDLE.clone();
 
