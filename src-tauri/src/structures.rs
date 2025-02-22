@@ -5,9 +5,9 @@ use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fs, path::PathBuf, sync::Arc};
 use tokio::sync::Mutex;
 use uuid::Uuid;
-lazy_static! {
-    static ref DB: Arc<Mutex<DataBase>> = Arc::new(Mutex::new(DataBase::new()));
-}
+// lazy_static! {
+//     static ref DB: Arc<Mutex<DataBase>> = Arc::new(Mutex::new(DataBase::new()));
+// }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Clip {
@@ -21,7 +21,7 @@ pub struct Clip {
 }
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
-struct DataBase {
+pub struct DataBase {
     data: HashMap<Uuid, Clip>,
     #[serde(skip)]
     path: PathBuf,
@@ -29,7 +29,6 @@ struct DataBase {
 
 impl DataBase {
     pub fn new() -> Self {
-
         let mut db = Self::default();
 
         let config_dir = dirs::config_local_dir().expect("Cannot determine config directory");
@@ -45,7 +44,6 @@ impl DataBase {
             false => db.save().expect("Could not save database to disk"),
             true => db.load().expect("Could not load existing db"),
         }
-        
 
         db
     }
@@ -64,17 +62,17 @@ impl DataBase {
         self.data = db.data;
         Ok(())
     }
-    fn to_vec(&self) -> Result<Vec<Clip>> {
+    pub fn to_vec(&self) -> Result<Vec<Clip>> {
         let clips: Vec<Clip> = self.data.iter().map(|(_, item)| item.clone()).collect();
         Ok(clips)
     }
 
-    fn insert_or_update_clip(&mut self, clip: Clip) -> Result<()> {
+    pub fn insert_or_update_clip(&mut self, clip: Clip) -> Result<()> {
         self.data.insert(clip.id, clip);
         self.save()?;
         Ok(())
     }
-    fn remove_clip(&mut self, clip_id: Uuid) -> Result<()> {
+    pub fn remove_clip(&mut self, clip_id: Uuid) -> Result<()> {
         self.data
             .remove(&clip_id)
             .ok_or_else(|| anyhow!("Clip ID '{}' not found", clip_id))?;
@@ -82,28 +80,4 @@ impl DataBase {
 
         Ok(())
     }
-}
-
-pub async fn insert(clip: Clip) -> Result<()> {
-    let mut db = DB.lock().await;
-    db.insert_or_update_clip(clip)?;
-    Ok(())
-}
-
-pub async fn update(clip: Clip) -> Result<()> {
-    let mut db = DB.lock().await;
-    db.insert_or_update_clip(clip)?;
-    Ok(())
-}
-
-pub async fn remove(clip_id: Uuid) -> Result<()> {
-    let mut db = DB.lock().await;
-    db.remove_clip(clip_id)?;
-    Ok(())
-}
-
-pub async fn get_clips_to_vec() -> Result<Vec<Clip>> {
-    let db = DB.lock().await;
-    let clips = db.to_vec()?;
-    Ok(clips)
 }
