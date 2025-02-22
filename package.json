@@ -23,6 +23,7 @@
     "@tauri-apps/plugin-clipboard-manager": "^2.2.1",
     "@tauri-apps/plugin-dialog": "^2.2.0",
     "@tauri-apps/plugin-log": "^2.2.1",
+    "@tauri-apps/plugin-notification": "^2.2.1",
     "@tauri-apps/plugin-opener": "^2",
     "motion": "^12.4.3",
     "react": "^18.3.1",

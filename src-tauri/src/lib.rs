@@ -1,8 +1,8 @@
 use anyhow::Result;
 use commands::del_clip;
 use commands::get_clips;
-use commands::new_clip;
 use commands::load;
+use commands::new_clip;
 use commands::save;
 use commands::update_clip;
 use structures::DataBase;
@@ -13,9 +13,12 @@ mod commands;
 mod structures;
 mod tray;
 
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub async fn run() -> Result<()> {
-    let builder = tauri::Builder::default().plugin(tauri_plugin_dialog::init());
+    let builder = tauri::Builder::default()
+        .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_dialog::init());
     // #[cfg(desktop)]
     // {
     //     builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args,

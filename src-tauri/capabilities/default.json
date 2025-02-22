@@ -17,6 +17,7 @@
     "core:window:allow-internal-toggle-maximize",
     "core:window:allow-set-always-on-top",
     "log:default",
-    "dialog:default"
+    "dialog:default",
+    "notification:default"
   ]
 }

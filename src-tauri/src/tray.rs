@@ -8,6 +8,7 @@ use tauri::tray::TrayIconEvent;
 use tauri::AppHandle;
 use tauri::Manager;
 use tauri::WindowEvent;
+use tauri_plugin_notification::NotificationExt;
 
 pub fn setup_tray(app: &AppHandle) -> Result<()> {
     let quit_item = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
@@ -59,6 +60,12 @@ pub fn setup_tray(app: &AppHandle) -> Result<()> {
                 api.prevent_close(); // Prevents the app from quitting
                 let main_window = app_handle.get_webview_window("main").unwrap();
                 let _ = main_window.hide();
+                app_handle.notification()
+                .builder()
+                .title("FastClip")
+                .body("FastClip is still running in your system tray. Double click to show window.")
+                .show()
+                .unwrap();
             }
         });
     }
