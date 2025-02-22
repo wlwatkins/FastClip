@@ -1,4 +1,4 @@
-import { Button, Flex, ScrollArea } from "@mantine/core";
+import { Flex, ScrollArea } from "@mantine/core";
 import { useViewportSize } from "@mantine/hooks";
 import Clip from "./Clip";
 import { useEffect, useState } from "react";
@@ -7,7 +7,7 @@ import FastClip from "../Classes/FastClip";
 import { invoke } from "@tauri-apps/api/core";
 import New from "./NewClip";
 import Settings from "./SettingsClip";
-import { IconArrowBigDown, IconBrandMantine, IconPlus } from "@tabler/icons-react";
+import { IconArrowBigDown } from "@tabler/icons-react";
 import { Text } from '@mantine/core';
 
 export default function ListOfClips() {
