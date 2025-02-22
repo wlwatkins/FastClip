@@ -34,7 +34,8 @@ pub fn setup_tray(app: &AppHandle) -> Result<()> {
                 TrayIconEvent::DoubleClick { button: MouseButton::Left, .. } => {
                     if let Some(window) = app.get_webview_window("main") {
                         if window.is_visible().unwrap_or(false) {
-                
+                            let _ = window.hide();
+                        } else {
                             let _ = window.show();
                             let _ = window.set_focus();
                         }
