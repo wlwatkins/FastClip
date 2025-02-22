@@ -56,8 +56,8 @@ The project is built with Tauri and React. The CSS framework used is [Mantine](h
 
 1. Clone this repository:
    ```sh
-   git clone <repo_url>
-   cd <repo_name>
+   git clone https://github.com/wlwatkins/FastClip
+   cd FastClip
    ```
 2. Install dependencies:
    ```sh
