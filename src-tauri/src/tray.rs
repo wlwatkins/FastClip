@@ -16,7 +16,7 @@ pub fn setup_tray(app: &AppHandle) -> Result<()> {
 
     let _tray = TrayIconBuilder::new()
         .menu(&menu)
-        .show_menu_on_left_click(true)
+        .show_menu_on_left_click(false)
         .on_menu_event(|app, event| {
             match event.id.0.as_str() {
                 "quit" => {
@@ -28,16 +28,20 @@ pub fn setup_tray(app: &AppHandle) -> Result<()> {
             }
         })
         .on_tray_icon_event(|tray, event| {
-            if let TrayIconEvent::DoubleClick {
-                button: MouseButton::Left,
-                ..
-            } = event
-            {
-                let app = tray.app_handle();
-                if let Some(window) = app.get_webview_window("main") {
-                    let _ = window.show();
-                    let _ = window.set_focus();
+            let app = tray.app_handle();
+            match event {
+                // Left Double Click: Toggle Window Visibility
+                TrayIconEvent::DoubleClick { button: MouseButton::Left, .. } => {
+                    if let Some(window) = app.get_webview_window("main") {
+                        if window.is_visible().unwrap_or(false) {
+                
+                            let _ = window.show();
+                            let _ = window.set_focus();
+                        }
+                    }
                 }
+        
+                _ => {}
             }
         })
         .icon(app.default_window_icon().unwrap().clone())
