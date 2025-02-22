@@ -68,11 +68,11 @@ export default function ListOfClips() {
 
 
                     <Text c="dimmed">Create your first clip +</Text>
-                     <IconArrowBigDown
-                          size={60}
-                          stroke={1}
-                          color="var(--mantine-color-gray-filled)"
-                        />
+                    <IconArrowBigDown
+                        size={60}
+                        stroke={1}
+                        color="var(--mantine-color-gray-filled)"
+                    />
                 </Flex>
             ) : (
                 <Flex
@@ -109,11 +109,3 @@ export default function ListOfClips() {
 
     )
 }
-function useDisclosure(arg0: boolean): [any, { open: any; close: any; }] {
-    throw new Error("Function not implemented.");
-}
-
-function useRef(arg0: { open: any; close: any; }) {
-    throw new Error("Function not implemented.");
-}
-
