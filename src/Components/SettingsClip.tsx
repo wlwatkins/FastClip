@@ -6,23 +6,47 @@ import { useEffect, useState } from "react";
 import { getVersion } from "@tauri-apps/api/app";
 import { open as load_file, save as save_file } from '@tauri-apps/plugin-dialog';
 import { invoke } from "@tauri-apps/api/core";
+import { enable, disable, isEnabled } from '@tauri-apps/plugin-autostart';
 
 export default function Settings() {
     const [opened, { open, close }] = useDisclosure(false);
-    const [alwaysOnTop, setAlwaysOnTop] = useState(false);
+    const [always_on_top, setAlwaysOnTop] = useState(false);
+    const [start_on_boot, setStartOnBoot] = useState(false);
     const [version, setVersion] = useState("");
 
     useEffect(() => {
+        // Fetch version on component mount
         getVersion().then(setVersion);
+
+        // Check if the app should start on boot
+        const fetchStartOnBoot = async () => {
+            const isAppEnabled = await isEnabled();
+            console.log(isAppEnabled);
+            setStartOnBoot(isAppEnabled);
+        };
+
+        fetchStartOnBoot();
     }, []);
 
 
-
     const handleAlwaysOnTop = async () => {
-        const newValue = !alwaysOnTop;
+        const newValue = !always_on_top;
         setAlwaysOnTop(newValue);
         await getCurrentWindow().setAlwaysOnTop(newValue);
     };
+
+    const handleStartOnBoot = async () => {
+        const newValue = !start_on_boot;
+        setStartOnBoot(newValue);
+        if (newValue) {
+            await enable();
+        } else {
+            disable();
+        }
+
+        await getCurrentWindow().setAlwaysOnTop(newValue);
+    };
+
 
 
     const handleLoad = async () => {
@@ -65,18 +89,6 @@ export default function Settings() {
     };
 
 
-    // const notify = (message: string) =>
-    // {
-    //     notifications.show({
-    //         title: message,
-    //         // position: "bottom-center",
-    //         message: "undefined"
-    //     });
-    //     console.log("aaa");
-    // }
-    // ;
-
-
     return (
 
         <>
@@ -87,10 +99,16 @@ export default function Settings() {
                     gap="md"
                 >
                     <Switch
-                        checked={alwaysOnTop}
+                        checked={always_on_top}
                         labelPosition="left"
                         onChange={handleAlwaysOnTop}
                         label="Keep window on top"
+                    />
+                    <Switch
+                        checked={start_on_boot}
+                        labelPosition="left"
+                        onChange={handleStartOnBoot}
+                        label="Start on system boot"
                     />
                     <Button.Group >
                         <Button variant="filled" size="xs" fullWidth onClick={handleLoad}>Load</Button>

@@ -68,7 +68,7 @@ The project is built with Tauri and React. The CSS framework used is [Mantine](h
    npm run tauri dev
    ```
 
-## Todo
+## Features and bug fix todo list
 
 - [X] Add a tray icon with right-click copy functionality.
 - [ ] Make program single instance.
@@ -79,6 +79,7 @@ The project is built with Tauri and React. The CSS framework used is [Mantine](h
 - [ ] Add file copy to clipboard functionality.
 - [ ] Implement keyboard shortcuts for quick macro activation.
 - [ ] Support multiple clipboard entries with history.
+- [X] Autostart or launch on boot.
 - [ ] Cloud synchronization for macros across devices.
 - [X] Add clear clipboard after a given amount of time.
 - [X] Export and import macros as JSON files.

@@ -7,16 +7,21 @@ use commands::save;
 use commands::update_clip;
 use structures::DataBase;
 use tauri::Manager;
+use tauri_plugin_autostart::MacosLauncher;
 use tokio::sync::Mutex;
 use tray::setup_tray;
+
 mod commands;
 mod structures;
 mod tray;
 
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub async fn run() -> Result<()> {
     let builder = tauri::Builder::default()
+        .plugin(tauri_plugin_autostart::init(
+            MacosLauncher::LaunchAgent,
+            None,
+        ))
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_dialog::init());
     // #[cfg(desktop)]
@@ -35,13 +40,6 @@ pub async fn run() -> Result<()> {
         .setup(|app| {
             app.manage(Mutex::new(DataBase::new()));
             setup_tray(app.handle())?;
-            // let app_handle = app.handle().clone(); // Clone `AppHandle` before moving it
-            // let global_handle = APP_HANDLE.clone();
-
-            // tauri::async_runtime::spawn(async move {
-            //     let mut handle_lock = global_handle.lock().await;
-            //     *handle_lock = Some(app_handle); // Store cloned handle
-            // });
 
             Ok(())
         })
