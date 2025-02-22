@@ -28,18 +28,15 @@ pub fn setup_tray(app: &AppHandle) -> Result<()> {
             }
         })
         .on_tray_icon_event(|tray, event| {
-            match event {
-                TrayIconEvent::DoubleClick {
+            if let TrayIconEvent::DoubleClick {
                     button: MouseButton::Left,
                     ..
-                } => {
-                    let app = tray.app_handle();
-                    if let Some(window) = app.get_webview_window("main") {
-                        let _ = window.show();
-                        let _ = window.set_focus();
-                    }
+                } = event {
+                let app = tray.app_handle();
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.show();
+                    let _ = window.set_focus();
                 }
-                _ => (),
             }
         })
         .icon(app.default_window_icon().unwrap().clone())

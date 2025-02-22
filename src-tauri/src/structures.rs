@@ -80,7 +80,7 @@ impl DataBase {
     }
 
     pub fn to_vec(&self) -> Result<Vec<Clip>> {
-        let clips: Vec<Clip> = self.data.iter().map(|(_, item)| item.clone()).collect();
+        let clips: Vec<Clip> = self.data.values().cloned().collect();
         Ok(clips)
     }
 
