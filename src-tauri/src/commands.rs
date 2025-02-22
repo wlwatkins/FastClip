@@ -59,8 +59,25 @@ pub async fn get_clips(state: State<'_, Mutex<DataBase>>) -> Result<Vec<Clip>, E
 }
 
 #[command(rename_all = "snake_case")]
-pub async fn load(state: State<'_, Mutex<DataBase>>, file: PathBuf) -> Result<(), Error> {
+pub async fn load(
+    state: State<'_, Mutex<DataBase>>,
+    app_handle: tauri::AppHandle,
+    file: PathBuf,
+) -> Result<(), Error> {
     let mut db = state.lock().await;
     *db = DataBase::from_path(file)?;
+    app_handle.emit("update_clips", db.to_vec()?)?;
+    Ok(())
+}
+
+#[command(rename_all = "snake_case")]
+pub async fn save(
+    state: State<'_, Mutex<DataBase>>,
+    app_handle: tauri::AppHandle,
+    file: PathBuf,
+) -> Result<(), Error> {
+    let db = state.lock().await;
+    db.to_path(file)?;
+    app_handle.emit("update_clips", db.to_vec()?)?;
     Ok(())
 }

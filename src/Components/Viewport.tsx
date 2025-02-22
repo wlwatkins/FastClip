@@ -8,7 +8,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { debug } from '@tauri-apps/plugin-log';
 
 
-
+import '@mantine/notifications/styles.css';
 
 export default function ListOfClips() {
     const { height } = useViewportSize();
@@ -77,6 +77,7 @@ export default function ListOfClips() {
 
                 </Flex>
             </ScrollArea>
+
 
         </Flex>
 

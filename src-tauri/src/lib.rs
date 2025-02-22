@@ -3,6 +3,7 @@ use commands::del_clip;
 use commands::get_clips;
 use commands::new_clip;
 use commands::load;
+use commands::save;
 use commands::update_clip;
 use structures::DataBase;
 use tauri::Manager;
@@ -46,7 +47,8 @@ pub async fn run() -> Result<()> {
             update_clip,
             get_clips,
             del_clip,
-            load
+            load,
+            save
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
