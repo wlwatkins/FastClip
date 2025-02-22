@@ -38,9 +38,9 @@ To install FastClip, download the NSIS executable and follow the installation in
 ## Usage
 
 ![Demonstration](assets/images/demonstration.gif)
-## Configuration
 
-There are no contributions at the moment. The only setting is whether the app stays on top or not.
+## Security
+
 The clipboards are saved unencrypted in appdata, hence why it must not be used for passwords.
 
 ## Building from Source
