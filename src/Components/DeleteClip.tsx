@@ -2,7 +2,6 @@ import { Button, Flex, Modal } from "@mantine/core";
 import { hasLength, useForm } from "@mantine/form";
 import FastClip from "../Classes/FastClip";
 import { invoke } from "@tauri-apps/api/core";
-import { info } from '@tauri-apps/plugin-log';
 interface DeleteProps {
     fastClipRef: React.MutableRefObject<FastClip>;
     opened: boolean;
@@ -25,8 +24,7 @@ export default function Delete({ fastClipRef, opened, close }: DeleteProps) {
 
     const handleDelClip = () => {
         invoke('del_clip', { "clip_id": fastClipRef.current.id })
-            .then((message: any) => info(message))
-            .catch((error) => error(error));
+            .catch((error) => console.error(error));
         close();
         form.reset()
     };

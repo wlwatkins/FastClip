@@ -18,7 +18,7 @@ pub struct Clip {
     icon:       String,
     colour:     String,
     visible:    bool,
-    clear_time: u64,
+    clear_time: Option<u64>,
 }
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]

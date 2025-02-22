@@ -8,7 +8,7 @@ import { open as load_file, save as save_file } from '@tauri-apps/plugin-dialog'
 import { invoke } from "@tauri-apps/api/core";
 
 export default function Settings() {
-    const [opened, { open, close }] = useDisclosure(true);
+    const [opened, { open, close }] = useDisclosure(false);
     const [alwaysOnTop, setAlwaysOnTop] = useState(false);
     const [version, setVersion] = useState("");
 

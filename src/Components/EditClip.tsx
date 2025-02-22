@@ -1,10 +1,9 @@
-import { ActionIcon, Box, ColorInput, Modal, Textarea, TextInput } from "@mantine/core";
+import { ActionIcon, Box, ColorInput, Modal, NumberInput, Switch, Textarea, TextInput } from "@mantine/core";
 import { hasLength, useForm } from "@mantine/form";
 import { IconClipboardCheckFilled, IconDeviceFloppy, IconTag } from '@tabler/icons-react';
 import FastClip from "../Classes/FastClip";
 import { invoke } from "@tauri-apps/api/core";
 import { useState } from "react";
-import { info } from '@tauri-apps/plugin-log';
 
 
 interface EditProps {
@@ -17,15 +16,24 @@ interface EditProps {
 export default function Edit({ fastClipRef, opened, close }: EditProps) {
     const [clip, setClip] = useState(fastClipRef);
     const [colour, onChangeColour] = useState('rgba(47, 119, 150, 0.7)');
+    const [clear_time_enable, setClearTimeEnable] = useState(fastClipRef.current.clear_time ? true : false);
 
     const form = useForm({
         mode: 'controlled',
         initialValues: {
             value: clip.current.value,
             label: clip.current.label,
+            clear_time: clear_time_enable ? clip.current.clear_time : 60
         }, validate: {
             value: hasLength({ min: 1 }, 'Must be at least 1 characters'),
             label: hasLength({ min: 3 }, 'Must be at least 3 characters'),
+            clear_time: (value) => {
+                if (value === undefined) return null; // Allow undefined
+                if (typeof value !== 'number' || value < 1) {
+                    return 'Must be a positive number';
+                }
+                return null; // No error
+            }
         },
     });
 
@@ -34,16 +42,17 @@ export default function Edit({ fastClipRef, opened, close }: EditProps) {
         fastClipRef.current.value = values.value;
         fastClipRef.current.label = values.label;
         fastClipRef.current.colour = colour;
+        fastClipRef.current.clear_time = clear_time_enable ? values.clear_time : undefined;
         setClip(fastClipRef);
 
         form.setInitialValues({
           value: fastClipRef.current.value,
           label: fastClipRef.current.label,
+          clear_time: fastClipRef.current.clear_time,
         });
 
-        invoke('update_clip', {"clip": fastClipRef})
-            .then((message: any) => info(message))
-            .catch((error) => error(error));
+        invoke('update_clip', {"clip": fastClipRef.current})
+            .catch((error) => console.error(error));
         close();
         form.reset()
     };
@@ -89,16 +98,23 @@ export default function Edit({ fastClipRef, opened, close }: EditProps) {
                 />
 
 
-
-                {/* <Popover  trapFocus position="bottom" withArrow shadow="md" >
-                    <Popover.Target>
-                        <Button autoContrast mt={10} fullWidth radius="xl" color={colour}>Select colour</Button>
-                    </Popover.Target>
-                    <Popover.Dropdown>
-                        <ColorPicker format="rgba" value={colour} onChange={onChangeColour} />
-                    </Popover.Dropdown>
-                </Popover> */}
-
+                    <Switch
+                        mt={10}
+                        mb={5}
+                        size="xs"
+                        checked={clear_time_enable}
+                        labelPosition="left"
+                        label="Clear clipboard after N secs"
+                        onChange={(e) => setClearTimeEnable(e.target.checked)} // Extract boolean value
+                     />
+                    <NumberInput
+                        disabled={!clear_time_enable}
+                        min={10}
+                        step={1}
+                        value={form.values.clear_time} 
+                        key={form.key('clear_time')}
+                        {...form.getInputProps('clear_time')}
+                    />
 
                 <ColorInput
                     mt={10} 

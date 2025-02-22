@@ -7,11 +7,11 @@ import Edit from "./EditClip";
 import Delete from "./DeleteClip";
 import { useState, useEffect, useRef } from "react";
 import { useViewportSize } from "@mantine/hooks";
-import { info } from '@tauri-apps/plugin-log';
 
 interface ItemProps {
   fast_clip: FastClip;
 }
+
 
 const Clip: React.FC<ItemProps> = ({ fast_clip }) => {
   const fastClipRef = useRef<FastClip>(fast_clip);
@@ -21,14 +21,28 @@ const Clip: React.FC<ItemProps> = ({ fast_clip }) => {
   const [_copied, setCopied] = useState(false);
   const [_truncatedLabel, setTruncatedLabel] = useState(fastClipRef.current.label);
   const buttonRef = useRef<HTMLButtonElement>(null);
-  // Use ResizeObserver to detect button size changes
+  const [timeoutId, setTimeoutId] = useState<number | null>(null);
+
+
+  const clearClipboardAfter = (seconds: number) => {
+    if (timeoutId !== null) {
+      clearTimeout(timeoutId);
+    }
+
+    const newTimeoutId = setTimeout(() => {
+      navigator.clipboard.writeText(''); // Clear clipboard
+      console.log('Clipboard cleared after', seconds, 'seconds');
+      setTimeoutId(null); // Reset timeoutId after execution
+    }, seconds * 1000);
+    setTimeoutId(newTimeoutId);
+  };
+
   useEffect(() => {
     const buttonElement = buttonRef.current;
     if (!buttonElement) return;
 
     const observer = new ResizeObserver(() => {
-      const maxWidth = buttonElement.clientWidth - 30; // Subtract padding & icons
-      setTruncatedLabel(truncateText(fastClipRef.current.label, maxWidth));
+      setTruncatedLabel(fastClipRef.current.label);
     });
 
     observer.observe(buttonElement);
@@ -39,10 +53,15 @@ const Clip: React.FC<ItemProps> = ({ fast_clip }) => {
   const handlePutInClipBoard = () => {
     writeText(fastClipRef.current.value)
       .then(() => {
-        info("Text written successfully");
+        console.log("Text written successfully");
+
+        if (fastClipRef.current.clear_time) {
+          clearClipboardAfter(fastClipRef.current.clear_time);
+        }
+
       })
       .catch((error) => {
-        error("Error writing text:", error);
+        console.error("Error writing text:", error);
       });
   };
 
@@ -54,37 +73,37 @@ const Clip: React.FC<ItemProps> = ({ fast_clip }) => {
 
   return (
     <>
-      <Grid w="100%"  justify="center" align="center">
+      <Grid w="100%" justify="center" align="center">
         <Grid.Col span="auto">
-            <Tooltip withArrow multiline label={
-              <div style={{
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                width: '100%'
-              }}>
-                {fastClipRef.current.value}
-              </div>
-            } position="bottom" color="gray" w={width * 0.90}>
+          <Tooltip withArrow multiline label={
+            <div style={{
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              width: '100%'
+            }}>
+              {fastClipRef.current.value}
+            </div>
+          } position="bottom" color="gray" w={width * 0.90}>
 
-              <Button
-                ref={buttonRef} // Reference for measuring width
-                fullWidth
-                autoContrast
-                justify="space-between"
-                leftSection={<IconTag size={14} />}
-                variant="filled"
-                color={fastClipRef.current.colour}
-                radius="md"
-                size="xs"
-                onClick={handleCopy}
-                
-              >
-                  {fastClipRef.current.label}
-              </Button>
+            <Button
+              ref={buttonRef} // Reference for measuring width
+              fullWidth
+              autoContrast
+              justify="space-between"
+              leftSection={<IconTag size={14} />}
+              variant="filled"
+              color={fastClipRef.current.colour}
+              radius="md"
+              size="xs"
+              onClick={handleCopy}
+
+            >
+              {fastClipRef.current.label}
+            </Button>
 
 
-            </Tooltip>
+          </Tooltip>
         </Grid.Col>
 
         <Grid.Col span="content">

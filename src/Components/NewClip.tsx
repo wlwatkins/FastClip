@@ -1,40 +1,51 @@
-import { ActionIcon, Box, Button, ColorPicker, Modal, Popover, Textarea, TextInput } from "@mantine/core";
+import { ActionIcon, Box, Button, ColorPicker, Modal, NumberInput, Popover, Switch, Textarea, TextInput } from "@mantine/core";
 import { hasLength, useForm } from "@mantine/form";
 import { useDisclosure } from "@mantine/hooks";
 import { IconClipboardCheckFilled, IconPlus, IconSend, IconTag } from '@tabler/icons-react';
 import FastClip from "../Classes/FastClip";
 import { invoke } from "@tauri-apps/api/core";
 import { useState } from "react";
-import { debug, info } from '@tauri-apps/plugin-log';
 
 
 
 export default function New() {
     const [opened, { open, close }] = useDisclosure(false);
     const [colour, onChangeColour] = useState('rgba(47, 119, 150, 0.7)');
-
+    const [clear_time_enable, setClearTimeEnable] = useState(false);
 
     const form = useForm({
         mode: 'uncontrolled',
         initialValues: {
             value: '',
             label: '',
+            clear_time: 60
         }, validate: {
             value: hasLength({ min: 1 }, 'Must be at least 1 characters'),
             label: hasLength({ min: 3 }, 'Must be at least 3 characters'),
+            clear_time: (value) => {
+                if (value === undefined) return null; // Allow undefined
+                if (typeof value !== 'number' || value < 1) {
+                    return 'Must be a positive number';
+                }
+                return null; // No error
+            }
         },
-
     });
 
     const handleSubmit = (values: typeof form.values) => {
-
-        const clip = new FastClip(values.value, values.label, "📌", colour);
-        debug(`Form submitted with: ${clip}`);
+        const clip = new FastClip(
+            values.value, 
+            values.label, 
+            "📌", 
+            colour, 
+            true,
+            clear_time_enable ? values.clear_time : undefined
+        );
+        console.log(`Form submitted with: ${clip}`);
 
 
         invoke('new_clip', { "clip": clip })
-            .then((message: any) => info(message))
-            .catch((error) => error(error));
+            .catch((error) => console.error(error));
         close();
         form.reset()
     };
@@ -58,7 +69,6 @@ export default function New() {
 
                     <TextInput
                         leftSection={<IconTag size={16} />}
-
                         withAsterisk
                         mt={10}
                         label="Label"
@@ -79,7 +89,23 @@ export default function New() {
                         {...form.getInputProps('value')}
                     />
 
-
+                    <Switch
+                        mt={10}
+                        mb={5}
+                        size="xs"
+                        checked={clear_time_enable}
+                        labelPosition="left"
+                        label="Clear clipboard after N secs"
+                        onChange={(e) => setClearTimeEnable(e.target.checked)} // Extract boolean value
+                     />
+                    <NumberInput
+                        disabled={!clear_time_enable}
+                        min={10}
+                        step={1}
+                        value={form.values.clear_time} 
+                        key={form.key('clear_time')}
+                        {...form.getInputProps('clear_time')}
+                    />
 
 
                     <Popover trapFocus position="bottom" withArrow shadow="md" >

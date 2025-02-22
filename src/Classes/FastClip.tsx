@@ -7,9 +7,9 @@ class FastClip {
     icon: string;
     colour: string;
     visible: boolean;
-    clear_time: number;
+    clear_time: number | undefined;
 
-    constructor(value: string, label: string, icon: string, colour:string = "red", visible: boolean=true, clear_time: number = 60) {
+    constructor(value: string, label: string, icon: string, colour:string = "red", visible: boolean=true, clear_time: number | undefined = undefined) {
         this.id = uuidv4(); // Generate a unique ID
         this.value = value;
         this.label = label;

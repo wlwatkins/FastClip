@@ -73,14 +73,16 @@ The project is built with Tauri and React. The CSS framework used is [Mantine](h
 - [X] Add a tray icon with right-click copy functionality.
 - [ ] Make program single instance.
 - [ ] Encrypt the database.
+- [ ] Detected password so to notify user not to use this as a password manager
 - [ ] Switch to SurrealDB.
 - [ ] Improve the UI with better animations.
-- [ ] Add file copy functionality.
+- [ ] Add file copy to clipboard functionality.
 - [ ] Implement keyboard shortcuts for quick macro activation.
 - [ ] Support multiple clipboard entries with history.
 - [ ] Cloud synchronization for macros across devices.
-- [ ] Export and import macros as JSON files.
-- [ ] Fix UI when editing label delete window not updated
+- [X] Add clear clipboard after a given amount of time.
+- [X] Export and import macros as JSON files.
+- [X] Fix UI when editing label delete window not updated
 
 
 ## Contributing

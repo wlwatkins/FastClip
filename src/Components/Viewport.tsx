@@ -5,7 +5,6 @@ import { useEffect, useState } from "react";
 import { listen, UnlistenFn } from "@tauri-apps/api/event";
 import FastClip from "../Classes/FastClip";
 import { invoke } from "@tauri-apps/api/core";
-import { debug } from '@tauri-apps/plugin-log';
 
 
 import '@mantine/notifications/styles.css';
@@ -21,7 +20,7 @@ export default function ListOfClips() {
         const unlistenPromises: Promise<UnlistenFn>[] = [];
 
         unlistenPromises.push(listen('update_clips', (event) => {
-            debug(event.payload as string);
+            console.log(event.payload as string);
             SetClips(event.payload as Array<FastClip>);
         }));
 
@@ -35,12 +34,15 @@ export default function ListOfClips() {
 
     useEffect(() => {
         const initialize = async () => {
-            try {
-                const message = await invoke('get_clips');
+            invoke('get_clips')
+            .then((message) => {
+                console.log(message);
                 SetClips(message as Array<FastClip>);
-            } catch (error) {
-                console.error(error); // Log the error if something goes wrong
-            }
+            })
+            .catch((error) => {
+                console.error(error);
+            });
+
         };
 
         initialize(); // Call the async function inside useEffect
@@ -71,9 +73,10 @@ export default function ListOfClips() {
                     gap={10}
                     direction="column" p={0} m={0}
                 >
-                    {clips.map((clip, index) => (
-                        <Clip key={index} fast_clip={clip} />
-                    ))}
+                    {clips.map((clip) => (
+                    <Clip key={clip.id} fast_clip={clip} /> // Assuming `clip.id` is unique
+                ))}
+
 
                 </Flex>
             </ScrollArea>
