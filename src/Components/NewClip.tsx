@@ -10,7 +10,7 @@ import { useState } from "react";
 
 export default function New() {
     const [opened, { open, close }] = useDisclosure(false);
-    const [colour, onChangeColour] = useState('rgba(47, 119, 150, 0.7)');
+    const [colour, onChangeColour] = useState('#000814');
     const [clear_time_enable, setClearTimeEnable] = useState(false);
 
     const form = useForm({

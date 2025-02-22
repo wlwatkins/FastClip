@@ -90,7 +90,7 @@ export default function Settings() {
                         checked={alwaysOnTop}
                         labelPosition="left"
                         onChange={handleAlwaysOnTop}
-                        label="Keep on top"
+                        label="Keep window on top"
                     />
                     <Button.Group >
                         <Button variant="filled" size="xs" fullWidth onClick={handleLoad}>Load</Button>

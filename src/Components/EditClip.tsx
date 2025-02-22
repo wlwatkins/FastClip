@@ -15,7 +15,7 @@ interface EditProps {
 
 export default function Edit({ fastClipRef, opened, close }: EditProps) {
     const [clip, setClip] = useState(fastClipRef);
-    const [colour, onChangeColour] = useState('rgba(47, 119, 150, 0.7)');
+    const [colour, onChangeColour] = useState(fastClipRef.current.colour);
     const [clear_time_enable, setClearTimeEnable] = useState(fastClipRef.current.clear_time ? true : false);
 
     const form = useForm({
@@ -23,6 +23,7 @@ export default function Edit({ fastClipRef, opened, close }: EditProps) {
         initialValues: {
             value: clip.current.value,
             label: clip.current.label,
+            colour: clip.current.colour,
             clear_time: clear_time_enable ? clip.current.clear_time : 60
         }, validate: {
             value: hasLength({ min: 1 }, 'Must be at least 1 characters'),
@@ -48,6 +49,7 @@ export default function Edit({ fastClipRef, opened, close }: EditProps) {
         form.setInitialValues({
           value: fastClipRef.current.value,
           label: fastClipRef.current.label,
+          colour: fastClipRef.current.colour,
           clear_time: fastClipRef.current.clear_time,
         });
 
