@@ -4,7 +4,6 @@ use crate::structures::Clip;
 use crate::structures::DataBase;
 use anyhow::anyhow;
 use anyhow::Result;
-use log::debug;
 use tauri::command;
 use tauri::Emitter;
 use tauri::Error;
