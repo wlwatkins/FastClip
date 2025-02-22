@@ -57,21 +57,21 @@ impl DataBase {
         fs::write(&path, json)?;
         Ok(())
     }
+    
     pub fn from_path<P: AsRef<Path>>(path: P) -> Result<Self> {
         let json = fs::read_to_string(&path)?;
         let db: Self = serde_json::from_str(&json)?;
-        Ok(db)
+        let mut new_db = Self::new();
+        new_db.data = db.data;
+        Ok(new_db)
     }
 
-    /// Saves the current instance of `AppData` to disk using JSON
-    /// serialization.
     pub fn save(&self) -> Result<()> {
         let json = serde_json::to_string_pretty(self)?;
         fs::write(&self.path, json)?;
         Ok(())
     }
 
-    /// Loads the `AppData` instance from disk by deserializing the JSON file.
     pub fn load(&mut self) -> Result<()> {
         let json = fs::read_to_string(&self.path)?;
         let db: Self = serde_json::from_str(&json)?;

@@ -6,9 +6,8 @@ import '@mantine/notifications/styles.css';
 import New from "./Components/NewClip";
 import ToolBar from "./Components/ToolBar";
 import Settings from "./Components/SettingsClip";
+
 function App() {
-
-
   return (
     <Center  className="bg-zinc-800">
       <ToolBar/>

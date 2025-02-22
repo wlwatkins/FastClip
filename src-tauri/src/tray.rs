@@ -3,7 +3,6 @@ use log::debug;
 use tauri::menu::Menu;
 use tauri::menu::MenuItem;
 use tauri::tray::MouseButton;
-use tauri::tray::MouseButtonState;
 use tauri::tray::TrayIconBuilder;
 use tauri::tray::TrayIconEvent;
 use tauri::AppHandle;
@@ -30,9 +29,8 @@ pub fn setup_tray(app: &AppHandle) -> Result<()> {
         })
         .on_tray_icon_event(|tray, event| {
             match event {
-                TrayIconEvent::Click {
+                TrayIconEvent::DoubleClick {
                     button: MouseButton::Left,
-                    button_state: MouseButtonState::Up,
                     ..
                 } => {
                     let app = tray.app_handle();
