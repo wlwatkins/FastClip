@@ -1,11 +1,10 @@
-import { Button, Flex, ScrollArea } from "@mantine/core";
+import { Flex, ScrollArea } from "@mantine/core";
 import { useViewportSize } from "@mantine/hooks";
 import Clip from "./Clip";
 import { useEffect, useState } from "react";
 import { listen, UnlistenFn } from "@tauri-apps/api/event";
 import FastClip from "../Classes/FastClip";
 import { invoke } from "@tauri-apps/api/core";
-import { notifications } from '@mantine/notifications';
 
 
 export default function ListOfClips() {
