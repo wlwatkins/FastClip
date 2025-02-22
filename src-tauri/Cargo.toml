@@ -1,9 +1,9 @@
 [package]
 name = "fast-clip"
 version = "0.4.3-1"
-description = "A Tauri App"
+description = "A fast and lightweight clipboard manager built with Rust and Tauri"
 authors = ["you"]
-edition = "2021"
+edition = "2024"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
