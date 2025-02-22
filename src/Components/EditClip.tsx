@@ -111,7 +111,7 @@ export default function Edit({ fastClipRef, opened, close }: EditProps) {
                      />
                     <NumberInput
                         disabled={!clear_time_enable}
-                        min={10}
+                        min={0}
                         step={1}
                         value={form.values.clear_time} 
                         key={form.key('clear_time')}

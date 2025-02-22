@@ -67,7 +67,7 @@ The project is built with Tauri and React. The CSS framework used is [Mantine](h
    ```sh
    npm run tauri dev
    ```
-
+yreeryyreery
 ## Features and bug fix todo list
 
 - [X] Add a tray icon with right-click copy functionality.
