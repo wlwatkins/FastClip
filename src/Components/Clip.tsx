@@ -1,68 +1,49 @@
-import { ActionIcon, Button, Grid, Tooltip } from "@mantine/core";
-import { IconTag, IconEdit, IconTrashX } from "@tabler/icons-react";
+import { Button } from "@mantine/core";
+import { IconEdit, IconTrashX, IconTag } from "@tabler/icons-react";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import FastClip from "../Classes/FastClip";
 import { useDisclosure } from "@mantine/hooks";
 import Edit from "./EditClip";
 import Delete from "./DeleteClip";
-import { useState, useEffect, useRef } from "react";
-import { useViewportSize } from "@mantine/hooks";
+import { useState, useRef, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { notifications } from "@mantine/notifications";
+import { ContextMenu } from "../Customs/ContextMenu";
 
 interface ItemProps {
   fast_clip: FastClip;
 }
 
-
 const Clip: React.FC<ItemProps> = ({ fast_clip }) => {
   const fastClipRef = useRef<FastClip>(fast_clip);
-  const { width } = useViewportSize();
   const [editOpened, { open: openEdit, close: closeEdit }] = useDisclosure(false);
   const [deleteOpened, { open: openDelete, close: closeDelete }] = useDisclosure(false);
   const [_copied, setCopied] = useState(false);
   const [_truncatedLabel, setTruncatedLabel] = useState(fastClipRef.current.label);
+  const [opened, setOpened] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
 
-
-
   useEffect(() => {
-    const buttonElement = buttonRef.current;
-    if (!buttonElement) return;
-
-    const observer = new ResizeObserver(() => {
-      setTruncatedLabel(fastClipRef.current.label);
-    });
-
-    observer.observe(buttonElement);
-
-    return () => observer.disconnect();
+    setTruncatedLabel(fastClipRef.current.label);
   }, [fastClipRef.current.label]);
 
   const handlePutInClipBoard = () => {
-
     notifications.show({
       title: `Copied '${fastClipRef.current.label}' to clipboard`,
       message: undefined,
-      withCloseButton: false,
-      // color: "lime",
+      withCloseButton: true,
       radius: "xs",
       position: "bottom-center"
     });
 
     writeText(fastClipRef.current.value)
       .then(() => {
-        console.log("Text written successfully");
-
         if (fastClipRef.current.clear_time) {
           invoke('delay_clear_clipboard', { "delay": fastClipRef.current.clear_time })
-            .catch((error) => console.error(error));
+            .catch(console.error);
         }
-
       })
-      .catch((error) => {
-        console.error("Error writing text:", error);
-      });
+      .catch(console.error);
   };
 
   const handleCopy = () => {
@@ -73,20 +54,17 @@ const Clip: React.FC<ItemProps> = ({ fast_clip }) => {
 
   return (
     <>
-      <Grid w="100%" justify="center" align="center">
-        <Grid.Col span="auto">
-          <Tooltip withArrow multiline label={
-            <div style={{
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              width: '100%'
-            }}>
-              {fastClipRef.current.value}
-            </div>
-          } position="bottom" color="gray" w={width * 0.90}>
-
-            <Button
+      <ContextMenu
+        shadow="md"
+        opened={opened}
+        onChange={setOpened}
+        closeOnClickOutside={true}
+        closeOnEscape={true}
+        position="bottom" offset={20}
+        withArrow
+      >
+     <ContextMenu.Target>
+        <Button
               ref={buttonRef} // Reference for measuring width
               fullWidth
               autoContrast
@@ -96,31 +74,23 @@ const Clip: React.FC<ItemProps> = ({ fast_clip }) => {
               color={fastClipRef.current.colour}
               radius="md"
               size="xs"
+              maw="100%"
               onClick={handleCopy}
+        >
+          {fastClipRef.current.label}
+        </Button>
+      </ContextMenu.Target>
 
-            >
-              {fastClipRef.current.label}
-            </Button>
 
-
-          </Tooltip>
-        </Grid.Col>
-
-        <Grid.Col span="content">
-          <ActionIcon.Group>
-            <ActionIcon variant="light" size="sm" onClick={openEdit}>
-              <IconEdit size={15} stroke={1.5} />
-            </ActionIcon>
-
-            <ActionIcon variant="light" color="red" size="sm" onClick={openDelete}>
-              <IconTrashX size={15} stroke={1.5} />
-            </ActionIcon>
-          </ActionIcon.Group>
-        </Grid.Col>
-      </Grid>
+        <ContextMenu.Dropdown>
+          {/* <ContextMenu.Label>Application</ContextMenu.Label> */}
+          <ContextMenu.Item leftSection={<IconEdit size={14} />} onClick={openEdit}>Edit clip</ContextMenu.Item>
+          <ContextMenu.Item leftSection={<IconTrashX size={14} />  } color="red" onClick={openDelete}>Delete</ContextMenu.Item>
+        </ContextMenu.Dropdown>
+      </ContextMenu>
 
       <Edit fastClipRef={fastClipRef} open={openEdit} close={closeEdit} opened={editOpened} />
-      <Delete fastClipRef={fastClipRef} open={openDelete} close={closeDelete} opened={deleteOpened} />
+      <Delete fastClipRef={fastClipRef} open={openDelete} close={closeDelete} opened={deleteOpened} /> 
     </>
   );
 };

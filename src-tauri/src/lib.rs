@@ -1,11 +1,11 @@
 use anyhow::Result;
 use commands::del_clip;
+use commands::delay_clear_clipboard;
 use commands::get_clips;
 use commands::load;
 use commands::new_clip;
 use commands::save;
 use commands::update_clip;
-use commands::delay_clear_clipboard;
 use structures::DataBase;
 use tauri::Manager;
 use tauri_plugin_autostart::MacosLauncher;
@@ -18,20 +18,21 @@ mod tray;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub async fn run() -> Result<()> {
-    let builder = tauri::Builder::default();
-    // #[cfg(desktop)]
-    // {
-    //     builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args,
-    // _cwd| {         let _ = app
-    //             .get_webview_window("main").unwrap()
-    //             .set_focus();
-    //     }));
-    // }
+    let mut builder = tauri::Builder::default();
+    #[cfg(desktop)]
+    {
+        builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            let _ = app.get_webview_window("main").unwrap().set_focus();
+        }));
+    }
 
-    builder      
+    builder
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_persisted_scope::init())
-        .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, None))
+        .plugin(tauri_plugin_autostart::init(
+            MacosLauncher::LaunchAgent,
+            None,
+        ))
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_clipboard_manager::init())

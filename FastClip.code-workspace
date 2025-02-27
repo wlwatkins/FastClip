@@ -4,5 +4,23 @@
 			"path": "."
 		}
 	],
-	"settings": {}
+	"settings": {},
+	"extensions": {"recommendations": [
+		"dustypomerleau.rust-syntax",
+		"fill-labs.dependi",
+		"hbenl.vscode-test-explorer",
+		"JScearcy.rust-doc-viewer",
+		"ms-vscode.js-debug",
+		"ms-vscode.js-debug-companion",
+		"ms-vscode.test-adapter-converter",
+		"ms-vscode.vscode-js-profile-table",
+		"PKief.material-icon-theme",
+		"rust-lang.rust-analyzer",
+		"Swellaby.vscode-rust-test-adapter",
+		"tamasfe.even-better-toml",
+		"tauri-apps.tauri-vscode",
+		"vadimcn.vscode-lldb",
+		"msjsdiag.vscode-react-native",
+		"spmeesseman.vscode-taskexplorer"
+	]}
 }
