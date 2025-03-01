@@ -1,11 +1,11 @@
-import { Button } from "@mantine/core";
+import { Box, Button } from "@mantine/core";
 import { IconEdit, IconTrashX, IconTag } from "@tabler/icons-react";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import FastClip from "../Classes/FastClip";
 import { useDisclosure } from "@mantine/hooks";
 import Edit from "./EditClip";
 import Delete from "./DeleteClip";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { notifications } from "@mantine/notifications";
 import { ContextMenu } from "../Customs/ContextMenu";
@@ -19,13 +19,9 @@ const Clip: React.FC<ItemProps> = ({ fast_clip }) => {
   const [editOpened, { open: openEdit, close: closeEdit }] = useDisclosure(false);
   const [deleteOpened, { open: openDelete, close: closeDelete }] = useDisclosure(false);
   const [_copied, setCopied] = useState(false);
-  const [_truncatedLabel, setTruncatedLabel] = useState(fastClipRef.current.label);
   const [opened, setOpened] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
 
-  useEffect(() => {
-    setTruncatedLabel(fastClipRef.current.label);
-  }, [fastClipRef.current.label]);
 
   const handlePutInClipBoard = () => {
     notifications.show({
@@ -52,46 +48,55 @@ const Clip: React.FC<ItemProps> = ({ fast_clip }) => {
     setTimeout(() => setCopied(false), 2000);
   };
 
+
+
   return (
-    <>
-      <ContextMenu
-        shadow="md"
-        opened={opened}
-        onChange={setOpened}
-        closeOnClickOutside={true}
-        closeOnEscape={true}
-        position="bottom" offset={20}
-        withArrow
-      >
-     <ContextMenu.Target>
+    <Box 
+    >
+
+
+    <ContextMenu
+      shadow="md"
+      opened={opened}
+      onChange={setOpened}
+      closeOnClickOutside={true}
+      closeOnEscape={true}
+      position="bottom" 
+      offset={20}
+      withArrow
+    >
+      <ContextMenu.Target>
         <Button
-              ref={buttonRef} // Reference for measuring width
-              fullWidth
-              autoContrast
-              justify="space-between"
-              leftSection={<IconTag size={14} />}
-              variant="filled"
-              color={fastClipRef.current.colour}
-              radius="md"
-              size="xs"
-              maw="100%"
-              onClick={handleCopy}
+          ref={buttonRef}
+          fullWidth
+          autoContrast
+          justify="space-between"
+          leftSection={<IconTag size={14} />}
+          variant="filled"
+          radius="md"
+          size="xs"
+          color={fastClipRef.current.colour}
+          onClick={handleCopy}
         >
-          {fastClipRef.current.label}
+          <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}}>
+            {fastClipRef.current.label}
+          </span>
         </Button>
+
+
       </ContextMenu.Target>
 
 
-        <ContextMenu.Dropdown>
-          {/* <ContextMenu.Label>Application</ContextMenu.Label> */}
-          <ContextMenu.Item leftSection={<IconEdit size={14} />} onClick={openEdit}>Edit clip</ContextMenu.Item>
-          <ContextMenu.Item leftSection={<IconTrashX size={14} />  } color="red" onClick={openDelete}>Delete</ContextMenu.Item>
-        </ContextMenu.Dropdown>
-      </ContextMenu>
+      <ContextMenu.Dropdown>
+        {/* <ContextMenu.Label>Application</ContextMenu.Label> */}
+        <ContextMenu.Item leftSection={<IconEdit size={14} />} onClick={openEdit}>Edit clip</ContextMenu.Item>
+        <ContextMenu.Item leftSection={<IconTrashX size={14} />} color="red" onClick={openDelete}>Delete</ContextMenu.Item>
+      </ContextMenu.Dropdown>
+    </ContextMenu>
 
-      <Edit fastClipRef={fastClipRef} open={openEdit} close={closeEdit} opened={editOpened} />
-      <Delete fastClipRef={fastClipRef} open={openDelete} close={closeDelete} opened={deleteOpened} /> 
-    </>
+    <Edit fastClipRef={fastClipRef} open={openEdit} close={closeEdit} opened={editOpened} />
+    <Delete fastClipRef={fastClipRef} open={openDelete} close={closeDelete} opened={deleteOpened} />
+  </Box>
   );
 };
 

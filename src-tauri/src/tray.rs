@@ -1,13 +1,13 @@
 use anyhow::Result;
 use log::debug;
+use tauri::AppHandle;
+use tauri::Manager;
+use tauri::WindowEvent;
 use tauri::menu::Menu;
 use tauri::menu::MenuItem;
 use tauri::tray::MouseButton;
 use tauri::tray::TrayIconBuilder;
 use tauri::tray::TrayIconEvent;
-use tauri::AppHandle;
-use tauri::Manager;
-use tauri::WindowEvent;
 use tauri_plugin_notification::NotificationExt;
 
 pub fn setup_tray(app: &AppHandle) -> Result<()> {
@@ -31,7 +31,10 @@ pub fn setup_tray(app: &AppHandle) -> Result<()> {
             let app = tray.app_handle();
             match event {
                 // Left Double Click: Toggle Window Visibility
-                TrayIconEvent::DoubleClick { button: MouseButton::Left, .. } => {
+                TrayIconEvent::DoubleClick {
+                    button: MouseButton::Left,
+                    ..
+                } => {
                     if let Some(window) = app.get_webview_window("main") {
                         if window.is_visible().unwrap_or(false) {
                             let _ = window.hide();
@@ -41,7 +44,7 @@ pub fn setup_tray(app: &AppHandle) -> Result<()> {
                         }
                     }
                 }
-        
+
                 _ => {}
             }
         })

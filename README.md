@@ -71,7 +71,7 @@ yreeryyreery
 ## Features and bug fix todo list
 
 - [X] Add a tray icon with right-click copy functionality.
-- [ ] Make program single instance.
+- [X] Make program single instance.
 - [ ] Encrypt the database.
 - [ ] Detected password so to notify user not to use this as a password manager
 - [ ] Switch to SurrealDB.

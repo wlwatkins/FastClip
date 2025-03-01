@@ -3,8 +3,11 @@ use commands::del_clip;
 use commands::delay_clear_clipboard;
 use commands::get_clips;
 use commands::load;
+use commands::load_db;
+use commands::lock;
 use commands::new_clip;
 use commands::save;
+use commands::unlock;
 use commands::update_clip;
 use structures::DataBase;
 use tauri::Manager;
@@ -13,6 +16,7 @@ use tokio::sync::Mutex;
 use tray::setup_tray;
 
 mod commands;
+mod password;
 mod structures;
 mod tray;
 
@@ -50,6 +54,9 @@ pub async fn run() -> Result<()> {
             del_clip,
             load,
             save,
+            unlock,
+            lock,
+            load_db,
             delay_clear_clipboard
         ])
         .run(tauri::generate_context!())

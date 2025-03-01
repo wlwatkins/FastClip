@@ -1,4 +1,4 @@
-import { Center } from "@mantine/core";
+import { Container } from "@mantine/core";
 import ListOfClips from "./Components/Viewport";
 import "./App.css";
 import "@mantine/core/styles.css"; 
@@ -7,10 +7,10 @@ import ToolBar from "./Components/ToolBar";
 
 function App() {
   return (
-    <Center  className="bg-zinc-800">
+    <Container fluid  size="responsive"  className="bg-zinc-800">
       <ToolBar/>
       <ListOfClips/>
-    </Center>
+    </Container>
   );
 }
 

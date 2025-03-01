@@ -76,32 +76,27 @@ export default function ListOfClips() {
                 </Flex>
             ) : (
                 <Flex
-                    w="95%"
-                    maw="500px"
-                    gap="md"
                     align="center"
                     direction="column"
                     style={{ height: `${height}px` }}
-                    p={10}
                     pt={50}
                 >
 
-                    <ScrollArea
+                     {/* <ScrollArea
                         h={height - 80}
-                        p={0}
-                        m={0} scrollbars="y"
-                        w="100%">
+                        scrollbars="y"
+                        >  */}
                         <Flex
-                            align="space-around"
                             gap={10}
-                            direction="column" p={0} m={0}
+                            direction="column"
+                            w="100%"
                         >
                             {clips.map((clip) => (
                                 <Clip key={clip.id} fast_clip={clip} /> // Assuming `clip.id` is unique
                             ))}
                         </Flex>
-                    </ScrollArea>
-                </Flex>
+                     {/* </ScrollArea>  */}
+                 </Flex>
             )}
             <New />
             <Settings />
