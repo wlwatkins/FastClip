@@ -1,4 +1,4 @@
-import { Flex, ScrollArea } from "@mantine/core";
+import { Flex } from "@mantine/core";
 import { useViewportSize } from "@mantine/hooks";
 import Clip from "./Clip";
 import { useEffect, useState } from "react";
