@@ -22,29 +22,29 @@ mod structures;
 mod tray;
 
 
-// async fn update(app: tauri::AppHandle) -> tauri_plugin_updater::Result<()> {
-//     if let Some(update) = app.updater()?.check().await? {
-//       let mut downloaded = 0;
+async fn update(app: tauri::AppHandle) -> tauri_plugin_updater::Result<()> {
+    if let Some(update) = app.updater()?.check().await? {
+      let mut downloaded = 0;
   
-//       // alternatively we could also call update.download() and update.install() separately
-//       update
-//         .download_and_install(
-//           |chunk_length, content_length| {
-//             downloaded += chunk_length;
-//             log::info!("downloaded {downloaded} from {content_length:?}");
-//           },
-//           || {
-//             log::info!("download finished");
-//           },
-//         )
-//         .await?;
+      // alternatively we could also call update.download() and update.install() separately
+      update
+        .download_and_install(
+          |chunk_length, content_length| {
+            downloaded += chunk_length;
+            log::info!("downloaded {downloaded} from {content_length:?}");
+          },
+          || {
+            log::info!("download finished");
+          },
+        )
+        .await?;
   
-//       log::info!("update installed");
-//       app.restart();
-//     }
+      log::info!("update installed");
+      app.restart();
+    }
   
-//     Ok(())
-//   }
+    Ok(())
+  }
 
 
 
@@ -74,10 +74,10 @@ pub async fn run() -> Result<()> {
         .setup(|app| {
             app.manage(Mutex::new(DataBase::new()));
 
-            // let handle = app.handle().clone();
-            // tauri::async_runtime::spawn(async move {
-            //   update(handle).await.unwrap();
-            // });
+            let handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+              update(handle).await.unwrap();
+            });
 
 
             setup_tray(app.handle())?;
