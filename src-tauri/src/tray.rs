@@ -17,6 +17,7 @@ pub fn setup_tray(app: &AppHandle) -> Result<()> {
     let _tray = TrayIconBuilder::new()
         .menu(&menu)
         .show_menu_on_left_click(false)
+        .tooltip("FastClip")
         .on_menu_event(|app, event| {
             match event.id.0.as_str() {
                 "quit" => {

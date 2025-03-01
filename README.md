@@ -79,6 +79,7 @@ yreeryyreery
 - [ ] Add file copy to clipboard functionality.
 - [ ] Implement keyboard shortcuts for quick macro activation.
 - [ ] Support multiple clipboard entries with history.
+- [ ] Auto updater.
 - [X] Autostart or launch on boot.
 - [ ] Cloud synchronization for macros across devices.
 - [X] Add clear clipboard after a given amount of time.
