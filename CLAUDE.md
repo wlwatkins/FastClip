@@ -94,12 +94,24 @@ so and stops.
 Read-only git is encouraged: `git status`, `git diff`, `git log`, `git show`.
 Knowing what changed is the point; changing what is recorded is not.
 
+**This applies to every shell tool, not only `Bash`.** On Windows the
+orchestrator reaches for `PowerShell` by default, so a rule written only against
+`Bash` blocks the tool nobody is using. Both are covered.
+
 `.claude/settings.json` denies these commands and a `PreToolUse` hook blocks
 variants, but **neither is a security boundary** — subagents are documented to
 bypass deny rules, and prefix matching misses `git -C . commit`. A
 `pre-commit` git hook is the backstop, because git enforces it whoever calls
 it. The instruction above is what actually does the work; the rest catches
 accidents.
+
+Three of those four layers were inert on 2026-07-29 and the orchestrator made
+three commits through them. The settings file sat at `.claude/agents/settings.json`,
+which Claude Code does not read; it pointed at a hook path that did not exist;
+the hook it pointed at matched `Bash` only; and `core.hooksPath` had never been
+set, so the `pre-commit` backstop never ran. **A policy that is written but not
+wired reads exactly like a policy that is working.** If you add a layer here,
+prove it fires before trusting it.
 
 ## Stack
 

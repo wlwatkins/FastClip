@@ -1,0 +1,54 @@
+{
+  "permissions": {
+    "deny": [
+      "Bash(git commit:*)",
+      "Bash(git add:*)",
+      "Bash(git push:*)",
+      "Bash(git stash:*)",
+      "Bash(git reset:*)",
+      "Bash(git rebase:*)",
+      "Bash(git merge:*)",
+      "Bash(git tag:*)",
+      "Bash(git checkout:*)",
+      "Bash(git switch:*)",
+      "Bash(git restore:*)",
+      "Bash(git cherry-pick:*)",
+      "Bash(git revert:*)",
+      "Bash(git clean:*)",
+      "Bash(gh pr create:*)",
+      "Bash(gh pr merge:*)",
+      "Bash(gh release:*)",
+      "PowerShell(git commit:*)",
+      "PowerShell(git add:*)",
+      "PowerShell(git push:*)",
+      "PowerShell(git stash:*)",
+      "PowerShell(git reset:*)",
+      "PowerShell(git rebase:*)",
+      "PowerShell(git merge:*)",
+      "PowerShell(git tag:*)",
+      "PowerShell(git checkout:*)",
+      "PowerShell(git switch:*)",
+      "PowerShell(git restore:*)",
+      "PowerShell(git cherry-pick:*)",
+      "PowerShell(git revert:*)",
+      "PowerShell(git clean:*)",
+      "PowerShell(gh pr create:*)",
+      "PowerShell(gh pr merge:*)",
+      "PowerShell(gh release:*)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/no-git-writes.sh",
+            "statusMessage": "Checking for git writes"
+          }
+        ]
+      }
+    ]
+  }
+}
