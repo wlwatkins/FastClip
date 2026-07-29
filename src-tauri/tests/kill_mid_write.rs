@@ -13,7 +13,7 @@
 use std::process::Command;
 
 use fast_clip_lib::storage::{clips, StorePaths};
-use fast_clip_lib::{ClipError, Store};
+use fast_clip_lib::{ClipError, Colour, Store};
 
 /// Set by the parent to tell the child which directory to write into. Its
 /// absence is what makes the child test a no-op in an ordinary run.
@@ -97,7 +97,7 @@ fn the_child_commits_then_dies() {
     ));
     let written = store.with_unlocked_store(|open| -> Result<(), ClipError> {
         for n in 0..COMMITTED {
-            clips::insert(open, &format!("clip {n}"), "a value", "unset")?;
+            clips::insert(open, &format!("clip {n}"), "a value", Colour::DEFAULT)?;
         }
         match clips::ids_in_order(open)?.first() {
             Some(id) => clips::increment_use_count(open, *id),
@@ -116,7 +116,7 @@ fn the_child_commits_then_dies() {
         for _ in 0..UNCOMMITTED {
             let inserted = open.execute(
                 "INSERT INTO clips (id, label, value, colour, use_count, position)
-                 VALUES (?1, 'in flight', 'a value', 'unset', 0,
+                 VALUES (?1, 'in flight', 'a value', 'slate', 0,
                          (SELECT COALESCE(MAX(position), -1) + 1 FROM clips))",
                 [uuid::Uuid::new_v4().as_hyphenated().to_string()],
             );

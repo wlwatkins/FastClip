@@ -177,7 +177,7 @@ mod tests {
         let connection = fresh(&dir);
         let result = connection.execute(
             "INSERT INTO clips (id, label, value, colour, use_count, position)
-             VALUES ('x', 'l', 'v', 'c', 'not an integer', 0)",
+             VALUES ('x', 'l', 'v', 'slate', 'not an integer', 0)",
             [],
         );
         assert!(result.is_err(), "STRICT should refuse a TEXT use_count");
@@ -188,7 +188,7 @@ mod tests {
         let dir = dir();
         let connection = fresh(&dir);
         let insert = "INSERT INTO clips (id, label, value, colour, use_count, position)
-                      VALUES (?1, 'l', 'v', 'c', 0, 0)";
+                      VALUES (?1, 'l', 'v', 'slate', 0, 0)";
         if let Err(e) = connection.execute(insert, ["a"]) {
             panic!("the first insert should succeed: {e}");
         }

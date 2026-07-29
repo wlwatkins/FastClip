@@ -12,6 +12,8 @@ The log is append-only. Superseding a review means writing a new one.
 | 001 | Book consistency (pre-G0b) | `REWORK_ARCHITECTURE` | 11 | 0 — all fixed |
 | [002](./002-wp-02-toolchain.md) | WP-02 Toolchain and CI skeleton (G3) | `ACCEPT` | 5 minor | 0 — all fixed. G4 condition open, not waived |
 | [003](./003-wp-01-contract.md) | WP-01 Contract ratification (G0b) | `ACCEPT` | 4 (1 major, 3 minor) | 0 — all 4 carried to WP-03 and WP-07 |
+| [004](./004-wp-10-palette.md) | WP-10 Palette and accessibility (G3) | `ACCEPT` | 4 (1 major, 3 minor) | 0 — all four fixed |
+| [005](./005-wp-05-crud.md) | WP-05 Clip list, copy, CRUD (G3) | `REWORK_ARCHITECTURE` → resolved | 5 (1 major, 4 minor) | 0 — all five fixed; ADR-0012 written |
 
 ## Verdicts
 

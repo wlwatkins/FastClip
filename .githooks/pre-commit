@@ -1,21 +1,43 @@
 #!/usr/bin/env bash
 # Backstop: git itself runs this, whoever invoked the commit and however.
 # Catches what the Claude Code deny rules and PreToolUse hook cannot —
-# commits from a script an agent wrote, or from a language runtime's
+# a commit from a script an agent wrote, or from a language runtime's
 # subprocess call.
 #
-# The owner commits by setting the variable below. An agent has no reason to
-# know it exists, and this stops helpfulness rather than determined evasion.
+# It blocks the AI, not the owner.
+#
+# Claude Code sets CLAUDECODE=1 and a family of CLAUDE_CODE_* variables in
+# every shell it runs, and those are inherited by anything it spawns. Your
+# own terminal and your editor's git process do not have them, so you commit
+# normally — from VS Code's Source Control panel, from a terminal, from
+# anywhere — with nothing to remember and nothing to type.
+#
+# The earlier version of this hook worked the other way round: it blocked
+# every commit unless ALLOW_COMMIT=1 was set. That blocks the owner too, and
+# an IDE has no way to set an environment variable for its git calls, so
+# committing from VS Code was impossible. Detecting the agent is both more
+# usable and more accurate than demanding a passphrase from the human.
+#
+# Enable once with:  git config core.hooksPath .githooks
+#
+# Escape hatch, for the rare case where the owner genuinely wants to commit
+# from inside a Claude Code session:
 #
 #   ALLOW_COMMIT=1 git commit -m "..."
 #
-# Enable once with:  git config core.hooksPath .githooks
+# One caveat worth knowing: if you launch VS Code *from* a Claude Code shell,
+# it inherits these variables and this hook will block it. Launch your editor
+# from a normal terminal, or use the escape hatch.
 
-if [ "$ALLOW_COMMIT" != "1" ]; then
-  echo "" >&2
-  echo "  Commit blocked. No AI commits on this project." >&2
-  echo "  If you are the owner:  ALLOW_COMMIT=1 git commit -m \"...\"" >&2
-  echo "" >&2
-  exit 1
+if [ -n "$CLAUDECODE" ] || [ -n "$CLAUDE_CODE_ENTRYPOINT" ] || [ -n "$CLAUDE_PID" ]; then
+  if [ "$ALLOW_COMMIT" != "1" ]; then
+    echo "" >&2
+    echo "  Commit blocked — this shell is a Claude Code session." >&2
+    echo "  No AI commits on this project; the owner writes every commit." >&2
+    echo "" >&2
+    echo "  Owner override:  ALLOW_COMMIT=1 git commit -m \"...\"" >&2
+    echo "" >&2
+    exit 1
+  fi
 fi
 exit 0

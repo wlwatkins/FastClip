@@ -167,6 +167,7 @@ impl Store {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::colour::Colour;
     use crate::storage::clips;
     use std::sync::Arc;
 
@@ -190,7 +191,7 @@ mod tests {
         assert_eq!(store.startup_fault(), None);
 
         let count = store.with_unlocked_store(|open| {
-            clips::insert(open, "first", "a value", "unset")?;
+            clips::insert(open, "first", "a value", Colour::DEFAULT)?;
             clips::count(open)
         });
         assert_eq!(count, Ok(1));
@@ -261,7 +262,7 @@ mod tests {
                 let store = Arc::clone(&store);
                 std::thread::spawn(move || {
                     store.with_unlocked_store(|open| {
-                        clips::insert(open, &format!("clip {n}"), "a value", "unset")
+                        clips::insert(open, &format!("clip {n}"), "a value", Colour::DEFAULT)
                     })
                 })
             })
@@ -288,7 +289,9 @@ mod tests {
     fn shutdown_closes_the_connection_and_later_work_reports_the_fault() {
         let parent = dir();
         let store = store_in(&parent);
-        if let Err(e) = store.with_unlocked_store(|open| clips::insert(open, "a", "b", "c")) {
+        if let Err(e) =
+            store.with_unlocked_store(|open| clips::insert(open, "a", "b", Colour::DEFAULT))
+        {
             panic!("the insert should succeed: {e}");
         }
         store.shutdown();

@@ -26,6 +26,7 @@
   - [0009 — Durability level](./architecture/adr/0009-durability-level.md)
   - [0010 — Manual lock](./architecture/adr/0010-manual-lock.md)
   - [0011 — Flat backoff](./architecture/adr/0011-flat-backoff.md)
+  - [0012 — Logging](./architecture/adr/0012-logging.md)
 
 # Process
 
@@ -57,6 +58,8 @@
 - [Review log](./reviews/index.md)
   - [002 — WP-02 Toolchain and CI skeleton](./reviews/002-wp-02-toolchain.md)
   - [003 — WP-01 Contract ratification](./reviews/003-wp-01-contract.md)
+  - [004 — WP-10 Palette and accessibility](./reviews/004-wp-10-palette.md)
+  - [005 — WP-05 Clip list, copy, CRUD](./reviews/005-wp-05-crud.md)
 
 # Reference
 

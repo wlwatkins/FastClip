@@ -125,6 +125,11 @@ Weight this package hardest.
 - Enable, disable and change-PIN are each crash-safe.
 - A manual lock discloses nothing, in the window or the tray, and the process
   cannot read the store until the PIN is re-entered.
+- **Every control this package adds is reachable by `Tab`, operable by `Enter`
+  and `Space`, carries an accessible name, and shows a focus indicator distinct
+  from hover.** That includes the PIN entry, the enable, disable and change-PIN
+  flows, and the lock control. The PIN prompt is the first thing a user meets at
+  launch; a mouse-only PIN entry locks a keyboard user out of their own store.
 
 ## Carried from review 003
 

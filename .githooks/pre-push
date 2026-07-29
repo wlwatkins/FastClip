@@ -1,10 +1,18 @@
 #!/usr/bin/env bash
-# See .githooks/pre-commit. Same policy, applied to push.
-if [ "$ALLOW_PUSH" != "1" ]; then
-  echo "" >&2
-  echo "  Push blocked. No AI pushes on this project." >&2
-  echo "  If you are the owner:  ALLOW_PUSH=1 git push" >&2
-  echo "" >&2
-  exit 1
+# See .githooks/pre-commit. Same policy, same detection, applied to push.
+#
+# Blocks a push from a Claude Code shell. Your own terminal and your editor
+# push normally, with nothing to type.
+
+if [ -n "$CLAUDECODE" ] || [ -n "$CLAUDE_CODE_ENTRYPOINT" ] || [ -n "$CLAUDE_PID" ]; then
+  if [ "$ALLOW_PUSH" != "1" ]; then
+    echo "" >&2
+    echo "  Push blocked — this shell is a Claude Code session." >&2
+    echo "  No AI pushes on this project; the owner pushes." >&2
+    echo "" >&2
+    echo "  Owner override:  ALLOW_PUSH=1 git push" >&2
+    echo "" >&2
+    exit 1
+  fi
 fi
 exit 0

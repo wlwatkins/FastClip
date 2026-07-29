@@ -46,6 +46,7 @@ the way to move clips. The owner chose the home directory for discoverability.
 | `clips.db-wal`, `clips.db-shm` | SQLite's write-ahead log and shared-memory index. Present while the database is open, and removed by a clean close ([locking](#locking-on-demand), a conversion, shutdown). | With the database. | — |
 | `keyfile` | The DPAPI-protected wrapped DEK, the KDF parameters, and the failed-attempt state. Present **only** when encryption is on. | DPAPI. | yes, by the backend |
 | `settings.json` | `{ "version": 1, "always_on_top": false }`. | no | yes |
+| `fastclip.log` and its rotations | Diagnostics ([ADR-0012](./adr/0012-logging.md)). **Never any clip `label` or `value`**, and never a PIN, DEK or salt. | no | yes |
 
 `settings.json` is plaintext and outside the database because
 [spec §4.4](../product/spec.md#44-always-on-top) requires the always-on-top
@@ -184,11 +185,15 @@ and never the live store. It is closed at step 4, before the rename.
 
 The first two rows are the only places the store is opened **on the path into
 it**, which is what lets [contract §2](./contract.md#opening-the-database) name
-one reporting command for each of `crypto { corrupt }` and
-`unsupported_version { schema }`. **No command opens the store because it found
-it closed** — that is the rule, and it is narrower than "no command opens the
-store". A conversion opens one as a step of the work it was asked to do.
-`list_clips` is never the first thing to touch the store.
+one place each of `crypto { corrupt }` and `unsupported_version { schema }` is
+*discovered*. **No command opens the store because it found it closed** — that is
+the rule, and it is narrower than "no command opens the store". A conversion
+opens one as a step of the work it was asked to do. `list_clips` is never the
+first thing to touch the store.
+
+Discovering a fault once does **not** mean one command reports it. A fault is
+recorded and then relayed by whichever command next needs the store
+([contract §2](./contract.md#how-it-reaches-the-caller--from-wherever-the-caller-asks)).
 
 The two conversions are the exception, and they are not on that path: each opens
 the database it is building, and each **reopens the converted store before
@@ -323,7 +328,8 @@ show the user.
 ### When a delete fails
 
 **Steps 2 and 5 are both absorbed**: the delete is attempted, a failure is
-logged, startup continues, and the next launch tries again.
+logged ([ADR-0012](./adr/0012-logging.md)), startup continues, and the next
+launch tries again.
 
 The one legitimate cause is another process holding the file — a second FastClip
 mid-conversion — and deleting it there would break that conversion. Refusing to
@@ -536,8 +542,9 @@ must have preceded this reset it — and stays 0. Locking is not a failed attemp
 and starts no backoff.
 
 **Steps 3 and 4 cannot fail in a way the user is told about.** If the checkpoint
-or the close errors, the DEK is zeroised and the flag cleared regardless, and
-`lock` still returns success. Refusing to lock because a disk operation failed
+or the close errors, the DEK is zeroised and the flag cleared regardless, the
+failure is logged ([ADR-0012](./adr/0012-logging.md)), and `lock` still returns
+success. Refusing to lock because a disk operation failed
 would leave the clips on screen, which is what the user pressed the control to
 prevent. The residue discloses nothing: with encryption on, SQLCipher encrypts
 the `-wal` file too.
@@ -713,7 +720,7 @@ and the error for the operation that partly failed.
 
 **Step 9 cannot fail either conversion** — deleting `keyfile` on the disable
 path, deleting `clips.db.new-wal` and `clips.db.new-shm` on the enable path. Log
-it and continue. The return value is decided by step 7 alone.
+it ([ADR-0012](./adr/0012-logging.md)) and continue. The return value is decided by step 7 alone.
 
 Step 7, the reopen, is **not** in the absorbed set: it decides whether the
 application can serve clips, so it is reported. Step 8's emission happens
@@ -785,18 +792,20 @@ A blank window is not acceptable. Every failure below maps to a variant in
 | Wrong PIN | `bad_pin { attempts_remaining, retry_after_ms }` | `unlock` |
 | An unlock attempted while a wait is running | `backoff { retry_after_ms }` | `unlock` |
 | `keyfile` missing, unreadable, or from another Windows account or machine | `crypto { reason: "bad_key_material" }` | `get_lock_state` at launch; `unlock`, `disable_encryption` or `change_pin` on any later read |
-| Key unwrapped, database will not open or fails its integrity check | `crypto { reason: "corrupt" }` | `unlock` with encryption on; `get_lock_state` with it off |
-| `user_version` newer than this build | `unsupported_version { component: "schema" }` | `unlock` with encryption on; `get_lock_state` with it off |
+| Key unwrapped, database will not open or fails its integrity check | `crypto { reason: "corrupt" }` | `unlock` with encryption on. With it off, recorded at startup and relayed by whichever command next needs the store — `get_lock_state` first if the frontend follows the startup sequence |
+| `user_version` newer than this build | `unsupported_version { component: "schema" }` | as the row above |
 | `keyfile` version newer than this build | `unsupported_version { component: "key_material" }` | `get_lock_state` at launch; `unlock`, `disable_encryption` or `change_pin` on any later read — the same three readers as the row above |
 | Home directory unresolvable, `~/.fast-clip/` not creatable or not reachable | `storage` | `get_settings`, the first command to need the directory, and then `get_lock_state` for the same reason |
 | `clips.db` absent and not creatable, permissions, disk full | `storage` | `get_lock_state`. `get_settings` does not touch the database. |
 | **`clips.db` present but its header cannot be read** — permissions, a sharing violation, a second instance, a transient I/O error | `storage` | `get_lock_state`, from the `unreadable` classification ([above](#classifying-clipsdb)) |
 
-The third column is not decoration. It is what makes the
-[startup sequence](./contract.md#startup-sequence) implementable with one failure
-branch per step, and it follows from the store being opened on the path into it
-at exactly two points ([connections](#connections)). A variant arriving from a
-command not named in the third column is a backend defect.
+The third column says where the user meets each fault, not which command is
+permitted to carry it. For the two rows that are recorded at startup, **any
+command needing the store relays the same recorded value**; naming
+`get_lock_state` records that it is first in the
+[startup sequence](./contract.md#startup-sequence), which is why that sequence
+can have one failure branch per step. A variant that a command could not have
+obtained — `bad_pin` from `list_clips`, say — is a backend defect.
 
 Every one of these messages points at
 [export and import](../product/spec.md#46-export-and-import-json) as the

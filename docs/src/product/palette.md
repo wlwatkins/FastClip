@@ -40,8 +40,8 @@ Styling is Tailwind only ([ADR-0006](../architecture/adr/0006-tailwind.md)).
 
 ## Colour palette
 
-**Status:** Requirements agreed, values not yet chosen. `frontend-dev` fills
-this in at G1; `critic` verifies the contrast claims at G3.
+**Status:** Chosen at WP-10. Nine tokens, values below; `critic` verifies the
+contrast claims against the test at G3.
 
 Colour is a scanning aid. With thirty clips it is how a user finds one without
 reading. The set is closed rather than free because free choice lets a user
@@ -65,11 +65,46 @@ pick a fill that renders their own label illegible.
 
 ## Tokens
 
-*`frontend-dev` fills this in. One row per token.*
+Nine tokens: `red`, `amber`, `lime`, `green`, `teal`, `blue`, `violet`,
+`pink`, `slate`. Fill and foreground are Tailwind theme entries
+(`src/app.css` `@theme`, `--color-clip-<token>` and
+`--color-clip-<token>-fg`); nothing in a component holds a literal hex.
+
+Contrast is the WCAG relative-luminance ratio between Foreground and Fill,
+computed to two decimal places — the formula in
+[WCAG 2 §1.4.3](https://www.w3.org/TR/WCAG21/#contrast-minimum), not
+estimated. Four tokens (`amber`, `lime`, `green`, `teal`) are light fills
+with a dark foreground; five (`red`, `blue`, `violet`, `pink`, `slate`) are
+dark fills with a light foreground — the split itself widens the lightness
+spread the CVD requirement calls for, on top of the per-token spread below.
 
 | Token | Fill | Foreground | Contrast |
-| ----- | ---- | ---------- | -------- |
-|       |      |            |          |
+| ------ | ------- | ------- | ------- |
+| red | `#ce2a38` | `#f5f7fa` | 4.88:1 |
+| amber | `#db994d` | `#12151b` | 7.55:1 |
+| lime | `#b4d47d` | `#12151b` | 11.02:1 |
+| green | `#6cd091` | `#12151b` | 9.64:1 |
+| teal | `#48cbbe` | `#12151b` | 9.19:1 |
+| blue | `#296dbb` | `#f5f7fa` | 4.89:1 |
+| violet | `#8050d3` | `#f5f7fa` | 4.88:1 |
+| pink | `#c32e82` | `#f5f7fa` | 4.85:1 |
+| slate | `#636c83` | `#f5f7fa` | 4.89:1 |
+
+Every ratio clears 4.5:1 with a margin of at least 0.35, rather than sitting
+on the boundary, so a later hue nudge that shaves a few hundredths off does
+not silently fail the requirement it currently passes.
+
+**Lightness (HSL `L`), read alongside hue for the CVD requirement:** blue 45,
+slate 45, pink 47, red 49, teal 54, violet 57, amber 58, green 62, lime 66.
+Red and green — the pair that fails outright under a hue-only palette — sit
+13 points apart, the widest practical gap available once both also have to
+clear their own contrast floor. No two tokens share both a lightness band and
+an adjacent hue.
+
+All nine fills also clear 3:1 against the application background (`#18181b`)
+and the row hover colour (`#1a1f27`, below) — not a requirement for the rail,
+which is decorative rather than text, but the margin exists rather than being
+spent, so the rail reads at 250px without the user leaning on colour alone.
 
 ## Default
 
@@ -79,10 +114,33 @@ current build initialises the picker to the literal
 [inherited debt](../reference/debt.md) hides — every edit silently rewrites the
 stored value to it.
 
-Pick a default deliberately and name it in the table above.
+**Default: `slate`.** It is the one token that carries no category meaning —
+every hue in the other eight reads as a choice the user made, so a clip that
+has not been assigned a colour should not resemble one that was deliberately
+set to `red` or `blue`. `slate`'s desaturation (12% versus 50–66% for the rest)
+keeps it visually recessive at 250px: it does not compete with a hue the user
+picked on purpose.
 
 ## Verification
 
-The contrast figures above are a claim. `test-engineer` writes a test that
-computes the ratio for every token and fails below 4.5:1. An accessibility
-claim that is never checked drifts the first time someone tweaks a hue.
+The figures above were a claim before this package: computed by hand against
+the WCAG formula and recorded on this page, with nothing yet checking that
+`src/app.css`'s actual theme values matched them. `test-engineer`'s
+`tests/palette-contrast.test.ts` discharges that: it reads the
+`--color-clip-<token>` / `--color-clip-<token>-fg` custom properties straight
+out of `src/app.css` — not this page's table — and independently recomputes
+the WCAG 2 §1.4.3 contrast ratio for every token, failing below 4.5:1. It does
+not assert against the numbers above; it would catch a hue nudged in
+`app.css` without this table being updated to match, which asserting against
+the table would not. `test-engineer` proved the test's own sensitivity by
+perturbing `pink`'s foreground and watching it fail. The test passes as of
+WP-10, so requirement 2 — the only figure this page states as a ratio — is
+verified, not merely claimed.
+
+Requirements 1, 3 and 4 (distinguishable at 250px, legible against the dark
+background, distinguishable under colour-vision deficiency) are **not**
+covered by that test or any other in the toolchain: nothing here renders
+pixels or simulates colour-vision deficiency. The lightness-spread reasoning
+above is a design argument for those three, checked by a human at review, not
+a number a test recomputes. A later reader relying on this page should treat
+requirement 2 as VERIFIED and requirements 1, 3 and 4 as argued, not tested.

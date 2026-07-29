@@ -84,10 +84,22 @@ So **argument types are lenient and the command body validates**. This applies t
   `not_a_palette_token` rather than a serde enum failure.
 - Unknown fields are captured, not rejected, with
   `#[serde(flatten)] extra: serde_json::Map<String, serde_json::Value>`. A
-  non-empty `extra` is `invalid_input` naming its first key: `id` and
-  `use_count` give `not_permitted`, anything else gives `unknown_field`.
-  `deny_unknown_fields` cannot be combined with `flatten`, and is not wanted
-  here in any case.
+  non-empty `extra` is `invalid_input` naming **the lexicographically smallest
+  key** in it: `id` and `use_count` give `not_permitted`, anything else gives
+  `unknown_field`. `deny_unknown_fields` cannot be combined with `flatten`, and
+  is not wanted here in any case.
+
+  "Lexicographically smallest" is stated because `serde_json::Map` is a
+  `BTreeMap` **only while the crate's `preserve_order` feature is off**, and with
+  it on the map becomes an `IndexMap` and the same payload names a different
+  field. That feature must stay off, and a dependency that enables it changes
+  this contract's observable behaviour without touching this page. The worked
+  consequence: `{ "use_count": 1, "icon": "x" }` reports
+  `invalid_input { field: "icon", reason: "unknown_field" }` — never
+  `use_count`/`not_permitted`, because `icon` sorts first. Both keys are
+  rejections and only a frontend that bypassed its generated types can send
+  either, so which one is named matters less than its being decided here rather
+  than by a transitive feature flag.
 
 #### The argument itself — every command
 
@@ -445,49 +457,98 @@ Two failures can only be discovered by opening the clip database:
 `crypto { reason: "corrupt" }` and
 `unsupported_version { component: "schema" }`.
 
-The rule about them is narrower than an earlier version of this section claimed,
-and the distinction is **why** a command is opening a database.
+**Discovery and reporting are separate questions**, and an earlier version of
+this section answered only the first while writing rules as though it had
+answered both. That produced a sentence the backend cannot honour, corrected
+[below](#the-sentence-that-was-wrong).
 
-**On the path into the store — one reporter each.** Reaching the user's existing
-store is a single sequence with a single point of failure, and which command
-reports it depends only on whether encryption is on.
+#### Where the fault is discovered — one place
 
-| Encryption | The database opens | The open-time fault is reported by |
-| ---------- | ------------------ | ---------------------------------- |
-| Off — the default | During startup recovery, before any command is served. The backend opens it there regardless, because that is where it creates the database when it is absent ([storage](./storage.md#startup-recovery)). | [`get_lock_state`](#get_lock_state), which reports what startup recovery found. |
-| On | At [`unlock`](#unlock). The DEK does not exist until a PIN unwraps it, so nothing earlier can open the database. | [`unlock`](#unlock) |
+| Encryption | The database opens | Discovered by |
+| ---------- | ------------------ | ------------- |
+| Off — the default | During startup recovery, before any command is served. The backend opens it there regardless, because that is where it creates the database when it is absent ([storage](./storage.md#startup-recovery)). | startup recovery |
+| On | At [`unlock`](#unlock). The DEK does not exist until a PIN unwraps it, so nothing earlier can open the database. | `unlock` |
 
-No other command **on that path** declares either variant.
-[`list_clips`](#list_clips) in particular does not: with encryption off the
-database was already open before it could be called, and with encryption on
-`unlock` opened it. A `list_clips` returning `unsupported_version` is a backend
-defect.
+This is the property worth having and it is unchanged: **the fault is one value,
+established once.** No command opens the store because it found it closed, so no
+two commands can discover different faults, and there is a defined point at which
+the store is known good.
 
-**Off that path — the two conversions, legitimately.**
+#### How it reaches the caller — from wherever the caller asks
+
+Startup recovery does not fail the launch. It **records** the fault and leaves
+the store with no connection ([storage](./storage.md#startup-recovery)), so that
+there is a window in which to show a message. Every command that needs the store
+then passes the same guard, in this order:
+
+1. Is the store locked? → `locked`.
+2. Is there a recorded fault? → **return it verbatim.**
+3. Otherwise use the connection.
+
+So a recorded open-time fault is **relayed by every command that needs the
+store**, and each of them declares `crypto` and `unsupported_version`
+accordingly. It is relayed, never rediscovered: every report carries the
+identical value, because there is only one.
+
+"Needs the store" is the ten commands marked "works while locked: no", **plus
+[`enable_encryption`](#enable_encryption)**, which has to read the plaintext
+store in order to convert it. That command is marked "yes" because it never
+returns `locked`, which is a different question from whether it needs an open
+database — and the two are easy to conflate, which is why they are separated
+here. [`lock`](#lock), [`get_settings`](#get_settings) and
+[`set_always_on_top`](#set_always_on_top) need no connection at all and relay
+nothing: `lock` on an encrypted store is a no-op success, and the settings
+commands read a different file.
+
+`get_lock_state` is still the command the [startup sequence](#startup-sequence)
+meets it at first, and that is a sequencing fact rather than an exclusivity one.
+A frontend that follows the sequence sees the fault there and stops. A frontend
+that does not, or that had a command in flight, gets the same value from that
+command instead of an undeclared rejection.
+
+#### The sentence that was wrong
+
+This section previously said *"A `list_clips` returning `unsupported_version` is
+a backend defect"*, and the [startup sequence](#startup-sequence) repeated it.
+
+**The backend cannot honour that.** `list_clips` invoked on a store that never
+opened must return some `ClipError`; the page declared none for the case, so
+every available implementation was a contract violation. Calling something a
+backend defect is only legitimate when the backend can avoid doing it.
+
+The reasoning that produced it is worth naming, because it is the class of
+mistake and not the instance: this section had rejected *"letting every
+clip-touching command declare the open-time variants in case it happened to be
+first"*. That rejection was correct about commands **opening on demand** and each
+discovering a fault independently — which is what defines no point at which the
+store is known good. It does not apply to relaying one recorded value. One
+sentence was carrying both meanings, and the wrong one won.
+
+Two alternatives were available and both are rejected:
+
+| Alternative | Rejected because |
+| ----------- | ---------------- |
+| Map a recorded open-time fault to `storage` | It is untrue for a too-new schema, and it discards the `crypto` sentence the [copy deck](../product/copy.md) requires to point at import as the recovery path. It is also the mapping the conversion paragraph below argues against, so the page would have prescribed it in one place and forbidden it in another. |
+| Return `locked` so the frontend shows the PIN prompt | There is no PIN. It puts a prompt the user cannot satisfy over a plaintext store. |
+
+#### The conversions, and the same mechanism
+
 [`enable_encryption`](#enable_encryption) and
-[`disable_encryption`](#disable_encryption) both declare
-`crypto { reason: "corrupt" }`, and both must. They are not discovering the
-store's state; they open databases as part of the work they were asked to do —
-`disable_encryption` has to read the encrypted store in order to write a
-plaintext one, and each reopens the converted database before returning
-([storage](./storage.md#switching-encryption-on-and-off)). A failure there is a
-failure of the requested operation, and it is reported as what it is.
+[`disable_encryption`](#disable_encryption) also declare
+`crypto { reason: "corrupt" }`, and both must. They open databases as part of the
+work they were asked to do — `disable_encryption` has to read the encrypted store
+in order to write a plaintext one, and each reopens the converted database before
+returning ([storage](./storage.md#switching-encryption-on-and-off)). A failure
+there is a failure of the requested operation and is reported as what it is.
+**Do not map it to `storage`.**
 
-**Do not map a failed open during a conversion to `storage`.** An earlier version
-of this section forbade every command outside the two above from declaring these
-variants, which contradicted the conversions' own error rows forty lines below
-it. Read literally, it sent the user "Disk write failed" for an unopenable
-database, in place of the `crypto` sentence the
-[copy deck](../product/copy.md) requires to point at import as the recovery path.
-The rule was wrong, not the error rows.
-
-The alternative was to let every clip-touching command declare the open-time
-variants in case it happened to be first. Rejected: it gives the frontend a fault
-to handle at ten call sites and defines no point at which the store is known
-good, which is how a frontend ends up rendering an empty list over a database it
-never successfully read. The [startup sequence](#startup-sequence) has one
-failure branch per step because, on the path into the store, there is one place
-the fault can appear.
+A conversion whose post-commit reopen fails **records a fault in the same way
+startup recovery does** — `storage`, because the database was verified moments
+earlier and what failed is access rather than content
+([storage](./storage.md#the-reopen-and-why-it-is-verified-first)). The guard
+above then relays it. One mechanism, one rule, no special case: the backend holds
+at most one recorded fault, and every command that needs the store returns it
+until the next launch clears it.
 
 ---
 
@@ -504,13 +565,13 @@ const clips: Clip[] = await invoke("list_clips");
 | Arguments | none |
 | Returns | `Clip[]`, complete, in display order. Empty array when there are no clips — not an error. |
 | Mutates | no |
-| Errors | `locked`, `storage` |
+| Errors | `locked`, `crypto` (`corrupt`), `unsupported_version` (`schema`), `storage` |
 
-**`list_clips` never reports an open-time fault.** It is reachable only once the
-database is open, so `crypto` and `unsupported_version` cannot originate here.
-Which command does report them is fixed in
-[opening the database](#opening-the-database) — one fault, one reporter. A read
-that fails after the database is open is `storage`.
+**`crypto` and `unsupported_version` never *originate* here** — this command
+never opens the store. They are relayed: startup recovery or a failed conversion
+recorded a fault, and the guard every clip-touching command shares returns it
+verbatim ([opening the database](#opening-the-database)). A read that fails after
+the database is open is `storage`.
 
 ### `create_clip`
 
@@ -524,7 +585,7 @@ await invoke("create_clip", { clip: { label, value, colour } });
 | Returns | `null` |
 | Mutates | yes. The clip is appended at the end of the list; its `position` is the current maximum plus one, and `use_count` starts at 0. |
 | Emits | `update_clips` |
-| Errors | `invalid_input`, `locked`, `storage` |
+| Errors | `invalid_input`, `locked`, `crypto` (`corrupt`), `unsupported_version` (`schema`), `storage` |
 
 It returns `null` rather than the created `Clip`. The `update_clips` event is
 the only path by which list state reaches the frontend, so there is exactly one
@@ -550,7 +611,7 @@ await invoke("update_clip", { clip: { id, label, value, colour } });
 | Returns | `null` |
 | Mutates | yes. `id`, `position` and `use_count` are unchanged. |
 | Emits | `update_clips` |
-| Errors | `invalid_input`, `not_found`, `locked`, `storage` |
+| Errors | `invalid_input`, `not_found`, `locked`, `crypto` (`corrupt`), `unsupported_version` (`schema`), `storage` |
 
 An unknown `id` is `not_found`. It never creates a clip.
 
@@ -566,7 +627,7 @@ await invoke("delete_clip", { clip_id: "…" });
 | Returns | `null` |
 | Mutates | yes. Remaining clips are renumbered to keep `position` dense, in the same transaction ([ADR-0007](./adr/0007-list-order-representation.md)). |
 | Emits | `update_clips` |
-| Errors | `invalid_input` (`required`, `malformed_uuid`), `not_found`, `locked`, `storage` |
+| Errors | `invalid_input` (`required`, `malformed_uuid`), `not_found`, `locked`, `crypto` (`corrupt`), `unsupported_version` (`schema`), `storage` |
 
 Confirmation is a frontend concern ([spec §4.2](../product/spec.md#42-create-edit-delete)).
 The backend deletes when asked.
@@ -586,7 +647,7 @@ await invoke("copy_clip", { clip_id: "…" });
 | Returns | `null` |
 | Mutates | yes. `use_count` is incremented by exactly one. |
 | Emits | **nothing** ([ADR-0008](./adr/0008-use-count-stays-backend-side.md)) |
-| Errors | `invalid_input` (`required`, `malformed_uuid`), `not_found`, `clipboard`, `locked`, `storage` |
+| Errors | `invalid_input` (`required`, `malformed_uuid`), `not_found`, `clipboard`, `locked`, `crypto` (`corrupt`), `unsupported_version` (`schema`), `storage` |
 
 **Order of operations, in this order, before the command returns:**
 
@@ -594,8 +655,12 @@ await invoke("copy_clip", { clip_id: "…" });
 2. Write `value` to the clipboard. Failure → `clipboard`, and `use_count` is not
    incremented.
 3. `UPDATE clips SET use_count = use_count + 1 WHERE id = ?`, committed.
-   Failure → `storage`; the clipboard already holds the value, and the count is
-   one low.
+   A database or commit failure → `storage`; the clipboard already holds the
+   value, and the count is one low. **The row matching no clip → `not_found`**,
+   not `storage`: the clip was deleted between step 1 and here, which is a true
+   statement about the clip and not about the disk. It is the same variant step 1
+   would have returned a moment earlier, so the frontend's handling — resynchronise
+   with `list_clips` — is already right for it.
 4. Return.
 
 The clipboard write comes first because a count recorded for a copy that never
@@ -622,7 +687,7 @@ await invoke("reorder_clips", { order: [id1, id2, id3, …] });
 | Returns | `null` |
 | Mutates | yes, in one transaction |
 | Emits | `update_clips` |
-| Errors | `invalid_input` (`required`, `malformed_uuid`, `not_a_permutation`), `locked`, `storage` |
+| Errors | `invalid_input` (`required`, `malformed_uuid`, `not_a_permutation`), `locked`, `crypto` (`corrupt`), `unsupported_version` (`schema`), `storage` |
 
 `order` must be an exact permutation of the stored id set: same length, same
 members, no duplicates. Anything else is
@@ -646,7 +711,7 @@ const { exported } = await invoke("export_clips", { path: "C:\\…\\clips.json" 
 | Arguments | `path: string` — an absolute path to a `.json` file |
 | Returns | `ExportResult` — `{ exported: number }` |
 | Mutates | no |
-| Errors | `invalid_input` (`required`), `io`, `locked`, `storage` |
+| Errors | `invalid_input` (`required`), `io`, `locked`, `crypto` (`corrupt`), `unsupported_version` (`schema`), `storage` |
 
 The **frontend** opens the file dialog and passes the chosen absolute path. The
 backend never opens a dialog: putting UI sequencing in the backend would make
@@ -695,7 +760,7 @@ const { imported } = await invoke("import_clips", { path: "C:\\…\\clips.json" 
 | Returns | `ImportResult` — `{ imported: number }` |
 | Mutates | yes |
 | Emits | `update_clips`, only on success |
-| Errors | `invalid_input` (`required`), `import`, `io`, `locked`, `storage` |
+| Errors | `invalid_input` (`required`), `import`, `io`, `locked`, `crypto` (`corrupt`), `unsupported_version` (`schema`), `storage` |
 
 **Atomicity, as a mechanism.** Two phases, and the store is not touched during
 the first:
@@ -745,13 +810,16 @@ It does not open the clip database itself. Whether the store is encrypted is rea
 from the database file's header, and the rest from the key material beside it
 ([storage](./storage.md)).
 
-**It is nonetheless where an open-time fault surfaces when encryption is off**,
-because startup recovery opened the database before any command was served
+**It is nonetheless where the [startup sequence](#startup-sequence) meets an
+open-time fault when encryption is off**, because startup recovery opened the
+database before any command was served
 ([opening the database](#opening-the-database)). That is what the `corrupt` and
 `schema` variants above are: not a second attempt to open the store, but the
-report of the one that already happened. With encryption **on** the database was
-not opened, so neither is reachable here and both belong to
-[`unlock`](#unlock).
+recorded result of the one that already happened, relayed like any other command
+relays it. Being first in the sequence is why the frontend meets it here; it is
+not an exclusive right to carry it. With encryption **on** the database was not
+opened at startup, so neither variant is reachable from this command and both
+belong to [`unlock`](#unlock).
 
 **On a first run there is no store yet, and this command still succeeds.** The
 backend creates `~/.fast-clip/` and an empty `clips.db` at schema version 1
@@ -964,7 +1032,7 @@ await invoke("enable_encryption", { pin: "123456" });
 | Returns | `null` |
 | Mutates | yes. The store is converted to an encrypted database and key material is written. |
 | Emits | `lock_state` |
-| Errors | `invalid_input` (`required`, `not_six_digits`), `wrong_state` (`unencrypted`), `crypto` (`bad_key_material`, `corrupt`), `storage` |
+| Errors | `invalid_input` (`required`, `not_six_digits`), `wrong_state` (`unencrypted`), `crypto` (`bad_key_material`, `corrupt`), `unsupported_version` (`schema`), `storage` |
 
 The PIN is entered **twice in the user interface and sent once**. Confirming the
 two entries match is a frontend concern; the backend receives one PIN and has
@@ -1006,7 +1074,7 @@ await invoke("disable_encryption", { pin: "123456" });
 | Returns | `null` |
 | Mutates | yes. The store is rewritten as plaintext and the key material is deleted. |
 | Emits | `lock_state` |
-| Errors | `invalid_input` (`required`, `not_six_digits`), `bad_pin`, `wrong_state` (`encrypted`), `locked`, `crypto` (`bad_key_material`, `corrupt`), `unsupported_version` (`key_material`), `storage` |
+| Errors | `invalid_input` (`required`, `not_six_digits`), `bad_pin`, `wrong_state` (`encrypted`), `locked`, `crypto` (`bad_key_material`, `corrupt`), `unsupported_version` (`key_material`, `schema`), `storage` |
 
 Requires the store to be unlocked **and** the PIN
 ([spec §4.8](../product/spec.md#48-encryption-and-unlocking)). The confirmation
@@ -1041,7 +1109,7 @@ await invoke("change_pin", { current_pin: "123456", new_pin: "654321" });
 | Returns | `null` |
 | Mutates | yes. The DEK is re-wrapped under the new PIN. The database is **not** re-encrypted, so this is instant regardless of clip count ([ADR-0004](./adr/0004-optional-pin-encryption.md)). |
 | Emits | nothing. No field of `LockState` changes. |
-| Errors | `invalid_input` (`required`, `not_six_digits`), `bad_pin`, `wrong_state` (`encrypted`), `locked`, `crypto` (`bad_key_material`), `unsupported_version` (`key_material`), `storage` |
+| Errors | `invalid_input` (`required`, `not_six_digits`), `bad_pin`, `wrong_state` (`encrypted`), `locked`, `crypto` (`bad_key_material`, `corrupt`), `unsupported_version` (`key_material`, `schema`), `storage` |
 
 Requires the store to be unlocked. Not subject to backoff, on the same reasoning
 as `disable_encryption`; `bad_pin` carries `attempts_remaining: null` and
@@ -1162,6 +1230,26 @@ would repaint the clip list underneath the PIN prompt, which is the disclosure
 condition and removes a race that cannot otherwise be closed from either side
 alone.
 
+**A failed emission does not fail the command.** The mutation has already
+committed, so rejecting would tell the user that a create which succeeded had
+failed, and leave them looking at an error beside the clip they just made.
+Nothing recovers a mutation the user believes did not happen; the list recovers
+on the next event or the next `list_clips`. The failure is logged at error level
+([ADR-0012](./adr/0012-logging.md)) and the command returns `null`.
+
+This is the same rule the conversions follow after their commit point
+([storage](./storage.md#failures-after-the-commit-point-are-absorbed-not-reported)),
+and for the same reason: once the store has changed, a report of failure is a
+false statement about the store.
+
+**The accepted cost is a silently stale list.** No error reaches the user and
+nothing re-syncs automatically. That is tolerable only because the case is
+near-unreachable by design rather than by luck: §3 requires the app handle to be
+available before any command can be invoked, and the payload is a `Clip[]` of
+derived-`Serialize` types with no failure mode of its own. If this is ever
+observed in practice, it is evidence that one of those two guarantees broke, and
+the log line is what says which.
+
 ### `lock_state`
 
 | | |
@@ -1219,9 +1307,12 @@ so the frontend implements it once.
      An empty `Clip[]` means the store has no clips; a rejection means it could
      not be read, and showing the two the same way invites the user to create a
      clip into a store that has already failed.
-   - `crypto` and `unsupported_version` are not reachable here
-     ([`list_clips`](#list_clips)). Receiving one is a backend defect, and the
-     frontend shows the failure screen rather than inventing a recovery.
+   - Rejects with `crypto` or `unsupported_version` → **failure screen.** The
+     store never opened and step 3 did not report it — either because the
+     frontend skipped `get_lock_state` or because this call was already in
+     flight. It is the same recorded fault, relayed
+     ([opening the database](#opening-the-database)), so it maps to the same
+     screen.
 5. `locked: true` → show the PIN prompt. Do not call `list_clips`.
    - If `retry_after_ms` is non-null, the input starts disabled and counts down.
    - `unlock` rejects with `bad_pin` or `backoff` → stay on the PIN prompt with
@@ -1350,7 +1441,7 @@ true now, for a reason that arrived afterwards
 | `label` | 1–100 characters. Not empty and not whitespace-only. No control characters, including newline and tab. | `required`, `too_long`, `contains_control_characters` |
 | `value` | 1–10 000 characters. Not empty and not whitespace-only. Any character otherwise, including newlines. | `required`, `too_long` |
 | `colour` | A palette token. | `not_a_palette_token` |
-| `clip_id`, `order[]` | A hyphenated UUID. | `malformed_uuid` |
+| `clip_id`, `order[]`, `id` on an update | A hyphenated UUID. Parsed case-insensitively, stored lowercase ([§0](#0-wire-rules)). | `malformed_uuid` |
 | `pin`, `current_pin`, `new_pin` | Exactly 6 characters, each ASCII `0`–`9`. | `not_six_digits` |
 | `path` | Non-empty. | `required` |
 | `id` on a create, `use_count` anywhere | Never accepted. | `not_permitted` |

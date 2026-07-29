@@ -157,6 +157,7 @@ fn open_and_check(path: &Path) -> Result<Connection, ClipError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::colour::Colour;
     use crate::storage::clips;
 
     fn dir() -> tempfile::TempDir {
@@ -207,7 +208,7 @@ mod tests {
                 None => panic!("the first run should hold a connection"),
             };
             for label in ["first", "second", "third"] {
-                if let Err(e) = clips::insert(&open, label, "a value", "unset") {
+                if let Err(e) = clips::insert(&open, label, "a value", Colour::DEFAULT) {
                     panic!("the insert should succeed: {e}");
                 }
             }
@@ -346,7 +347,7 @@ mod tests {
             None => panic!("the first run should hold a connection"),
         };
         for label in ["first", "second"] {
-            if let Err(e) = clips::insert(&open, label, "a value", "unset") {
+            if let Err(e) = clips::insert(&open, label, "a value", Colour::DEFAULT) {
                 panic!("the insert should succeed: {e}");
             }
         }

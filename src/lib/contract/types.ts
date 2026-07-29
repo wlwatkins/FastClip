@@ -11,15 +11,23 @@
  * "Tokens"). `COLOUR_TOKENS` is the one declaration; `Colour` is derived from
  * it so the type and the boundary validator cannot drift apart.
  *
- * "unset" is WP-04's provisional placeholder, not a palette entry:
- * - it is not a colour name and cannot be mistaken for one
- * - no build ships with it (WP-12 gates on WP-10's removal of it)
- * - its rendered appearance is not designed
- *
- * WP-10 replaces the contents of this array with the ratified token list and
- * deletes "unset".
+ * Ratified at WP-10 — nine tokens, each with its own fill and foreground
+ * declared in the Tailwind theme (src/app.css) and documented with computed
+ * contrast ratios on docs/src/product/palette.md. The provisional "unset"
+ * placeholder WP-04 shipped is gone: no build ships with it, per WP-10's
+ * definition of done.
  */
-export const COLOUR_TOKENS = ["unset"] as const;
+export const COLOUR_TOKENS = [
+  "red",
+  "amber",
+  "lime",
+  "green",
+  "teal",
+  "blue",
+  "violet",
+  "pink",
+  "slate",
+] as const;
 
 export type Colour = (typeof COLOUR_TOKENS)[number];
 

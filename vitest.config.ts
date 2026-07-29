@@ -11,6 +11,14 @@ import { svelte } from "@sveltejs/vite-plugin-svelte";
 // meaningful assertion failure.
 export default defineConfig({
   plugins: [svelte({ hot: false })],
+  // Svelte 5 ships separate client and server runtimes selected by package
+  // export condition. Without forcing "browser" here, Vite/Vitest resolve
+  // the server (SSR) build for a component under test and `mount()` throws
+  // "not available on the server" the moment any test tries to render one —
+  // this is the standard fix documented for @testing-library/svelte + Vitest.
+  resolve: {
+    conditions: ["browser"],
+  },
   test: {
     environment: "jsdom",
     include: ["tests/**/*.test.ts", "src/**/*.test.ts"],

@@ -33,6 +33,28 @@ architect's preferred crate first; if it cannot do this in the time box,
 Report the build time and binary size impact. A bundled C compile is the
 slowest thing in this pipeline and needs caching from the start.
 
+### devops — the log sink
+
+Added after [review 005](../reviews/005-wp-05-crud.md). Install the log sink
+[ADR-0012](../architecture/adr/0012-logging.md) specifies: `tauri-plugin-log`,
+stdout plus a rotating file in `~/.fast-clip/`, **webview target off**. Pin the
+version and record it, as ADR-0005 set the rule.
+
+This is not tidiness. **Four accepted design decisions are load-bearing on the
+log existing** — the absorbed `update_clips` emission, post-commit conversion
+cleanup, the startup sweep and stray-`keyfile` deletes, and `lock`'s checkpoint
+and close. Each absorbs a failure on the stated ground that it is *recorded*
+rather than lost. With no sink installed, all four read "absorbed silently",
+which is what each was written to prevent. A released FastClip has no console
+attached, which is why a file and not stdout alone.
+
+**The content rule is the load-bearing half.** A file sink creates a new file in
+`~/.fast-clip/` and therefore a new way to breach spec §8 criterion 6, which no
+care in the storage layer prevents. A `log::` call formatting a clip `label` or
+`value` is a `BLOCK`-level finding. `log::error!("{error}")` on a `ClipError` is
+safe by construction, because no variant carries clip text — a property of that
+type worth keeping.
+
 ### test-engineer
 
 Install and configure the runners so the workflow has something to call:
@@ -50,6 +72,10 @@ No work.
 - The three version declarations agree, and CI fails if they diverge.
 - The SQLCipher spike has run, and the crate choice is recorded in
   [ADR-0005](../architecture/adr/0005-sqlite-store.md) with evidence.
+- A log sink is installed per [ADR-0012](../architecture/adr/0012-logging.md),
+  and a test creates, copies, edits and deletes a clip carrying a distinctive
+  value, then greps the log file and stdout for it and finds nothing. Spec §8
+  criterion 6 is otherwise tested only by inspection.
 
 ## Risks
 

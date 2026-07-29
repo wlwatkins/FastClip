@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<!--
+  Embedded into test binaries only, by build.rs.
+
+  Tauri's default features include `common-controls-v6`, so `muda` imports
+  `TaskDialogIndirect` from comctl32. That export exists only in version 6 of
+  the library, and version 6 is reached through a side-by-side activation
+  context rather than by filename: without a manifest asking for it, the loader
+  binds to the version 5.82 comctl32 in System32, finds no such export, and
+  kills the process at load with STATUS_ENTRYPOINT_NOT_FOUND before a single
+  test runs.
+
+  The application binary gets this from the manifest tauri-build embeds. A test
+  binary is built by cargo and gets none, which is why it is added here.
+-->
+<assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
+  <dependency>
+    <dependentAssembly>
+      <assemblyIdentity
+        type="win32"
+        name="Microsoft.Windows.Common-Controls"
+        version="6.0.0.0"
+        processorArchitecture="*"
+        publicKeyToken="6595b64144ccf1df"
+        language="*"
+      />
+    </dependentAssembly>
+  </dependency>
+</assembly>

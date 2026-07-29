@@ -22,6 +22,7 @@ writing a new ADR that supersedes it, not editing the old one.
 | [0009](./0009-durability-level.md) | Durability level: WAL with `synchronous = NORMAL` | Accepted; amended before acceptance by 0010 |
 | [0010](./0010-manual-lock.md) | Locking is manual, and it closes the database | Accepted at G0b, second round |
 | [0011](./0011-flat-backoff.md) | Wrong-PIN backoff is a flat 30 seconds | Accepted; supersedes 0004's backoff consequence |
+| [0012](./0012-logging.md) | A log sink exists, writes to a file, and never contains clip content | Accepted |
 
 0007 through 0010 are Accepted and **G0b is landed**. The critic returned
 `ACCEPT` on the fourth review of the ratified contract

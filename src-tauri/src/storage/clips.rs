@@ -4,15 +4,24 @@
 //! never crosses the IPC seam (ADR-0008), and it is deliberately **not**
 //! `Serialize`: the row type cannot become a payload by accident.
 //!
-//! Validation of `label`, `value` and `colour` belongs at the IPC boundary and
-//! is not repeated here — one rule, one owner (storage.md § Schema).
+//! Validation of `label` and `value` belongs at the IPC boundary and is not
+//! repeated here — one rule, one owner (storage.md § Schema). `colour` needs no
+//! validation at all here, because [`Colour`] is a closed enum and an
+//! unrenderable token has no representation to reach this layer with.
+//!
+//! The `colour` column stays `TEXT` (WP-03, deliberately not enumerated): a
+//! token is stored by name so the palette can be retuned without rewriting a
+//! row. Reading one back is a parse, exactly like the `id` column's, and a value
+//! this build cannot interpret is `storage` rather than a panic.
 
 use std::fmt;
 
 use rusqlite::{Connection, Transaction, TransactionBehavior};
 use uuid::Uuid;
 
+use crate::colour::Colour;
 use crate::error::ClipError;
+use crate::redact::Redacted;
 use crate::storage::storage_error;
 
 const COLUMNS: &str = "id, label, value, colour, use_count, position";
@@ -23,20 +32,11 @@ pub struct ClipRow {
     pub id: Uuid,
     pub label: String,
     pub value: String,
-    pub colour: String,
+    pub colour: Colour,
     /// Backend-owned. Ranks the tray menu and has no other consumer.
     pub use_count: i64,
     /// Dense, `0..N-1`, no gaps (ADR-0007).
     pub position: i64,
-}
-
-/// A length, standing in for text that must never be formatted into a log line.
-struct Redacted(usize);
-
-impl fmt::Debug for Redacted {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "<redacted, {} chars>", self.0)
-    }
 }
 
 /// Hand-written so that no `{:?}` anywhere — a log line, a panic message, an
@@ -46,8 +46,8 @@ impl fmt::Debug for ClipRow {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("ClipRow")
             .field("id", &self.id)
-            .field("label", &Redacted(self.label.chars().count()))
-            .field("value", &Redacted(self.value.chars().count()))
+            .field("label", &Redacted::of(&self.label))
+            .field("value", &Redacted::of(&self.value))
             .field("colour", &self.colour)
             .field("use_count", &self.use_count)
             .field("position", &self.position)
@@ -100,7 +100,7 @@ pub fn list(connection: &Connection) -> Result<Vec<ClipRow>, ClipError> {
             id: parse_id(&id)?,
             label,
             value,
-            colour,
+            colour: Colour::from_stored(&colour)?,
             use_count,
             position,
         });
@@ -140,7 +140,7 @@ pub fn insert(
     connection: &Connection,
     label: &str,
     value: &str,
-    colour: &str,
+    colour: Colour,
 ) -> Result<Uuid, ClipError> {
     let id = Uuid::new_v4();
     connection
@@ -161,7 +161,7 @@ pub fn update(
     id: Uuid,
     label: &str,
     value: &str,
-    colour: &str,
+    colour: Colour,
 ) -> Result<(), ClipError> {
     let changed = connection
         .execute(
@@ -176,6 +176,29 @@ pub fn update(
         });
     }
     Ok(())
+}
+
+/// One clip's `value`, for the clipboard.
+///
+/// Step 1 of the copy sequence (contract `copy_clip`): an unknown id is
+/// `not_found` and nothing else happens — in particular the clipboard is not
+/// written and no count moves.
+///
+/// It returns the `value` alone rather than the row, so that the copy path never
+/// holds a `label` it has no use for.
+pub fn value_of(connection: &Connection, id: Uuid) -> Result<String, ClipError> {
+    let found = connection.query_row(
+        "SELECT value FROM clips WHERE id = ?1",
+        [id_text(id)],
+        |row| row.get::<_, String>(0),
+    );
+    match found {
+        Ok(value) => Ok(value),
+        Err(rusqlite::Error::QueryReturnedNoRows) => Err(ClipError::NotFound {
+            clip_id: id_text(id),
+        }),
+        Err(e) => Err(storage_error("a clip value could not be read", &e)),
+    }
 }
 
 /// Increment one clip's `use_count` by exactly one, committed before returning.
@@ -303,7 +326,7 @@ mod tests {
     }
 
     fn add(connection: &Connection, label: &str) -> Uuid {
-        match insert(connection, label, "a value", "unset") {
+        match insert(connection, label, "a value", Colour::DEFAULT) {
             Ok(id) => id,
             Err(e) => panic!("the insert should succeed: {e}"),
         }
@@ -349,14 +372,14 @@ mod tests {
             panic!("the increment should succeed: {e}");
         }
 
-        if let Err(e) = update(&connection, id, "renamed", "new value", "other") {
+        if let Err(e) = update(&connection, id, "renamed", "new value", Colour::Violet) {
             panic!("the update should succeed: {e}");
         }
 
         let listed = rows(&connection);
         assert_eq!(listed[1].label, "renamed");
         assert_eq!(listed[1].value, "new value");
-        assert_eq!(listed[1].colour, "other");
+        assert_eq!(listed[1].colour, Colour::Violet);
         assert_eq!(listed[1].position, 1);
         assert_eq!(listed[1].use_count, 1);
     }
@@ -366,7 +389,7 @@ mod tests {
         let (_dir, connection) = store();
         let missing = Uuid::new_v4();
         assert_eq!(
-            update(&connection, missing, "l", "v", "c"),
+            update(&connection, missing, "l", "v", Colour::Teal),
             Err(ClipError::NotFound {
                 clip_id: missing.as_hyphenated().to_string()
             })
@@ -496,6 +519,28 @@ mod tests {
     }
 
     #[test]
+    fn a_value_is_read_back_exactly_as_it_was_stored() {
+        let (_dir, connection) = store();
+        let id = match insert(&connection, "first", "line one\nline two", Colour::DEFAULT) {
+            Ok(id) => id,
+            Err(e) => panic!("the insert should succeed: {e}"),
+        };
+        assert_eq!(value_of(&connection, id), Ok("line one\nline two".into()));
+    }
+
+    #[test]
+    fn the_value_of_an_unknown_clip_is_not_found() {
+        let (_dir, connection) = store();
+        let missing = Uuid::new_v4();
+        assert_eq!(
+            value_of(&connection, missing),
+            Err(ClipError::NotFound {
+                clip_id: missing.as_hyphenated().to_string()
+            })
+        );
+    }
+
+    #[test]
     fn incrementing_an_unknown_clip_is_not_found() {
         let (_dir, connection) = store();
         let missing = Uuid::new_v4();
@@ -527,7 +572,7 @@ mod tests {
             id: Uuid::nil(),
             label: "Support greeting".into(),
             value: "hunter2".into(),
-            colour: "unset".into(),
+            colour: Colour::Amber,
             use_count: 4,
             position: 2,
         };
@@ -536,6 +581,46 @@ mod tests {
         assert!(!rendered.contains("Support greeting"), "{rendered}");
         assert!(rendered.contains("<redacted, 7 chars>"), "{rendered}");
         assert!(rendered.contains("use_count: 4"), "{rendered}");
+    }
+
+    /// The column is `TEXT` holding the token's name, never hex and never an
+    /// ordinal. A palette retune must not require rewriting a single row
+    /// (`palette.md` requirement 5).
+    #[test]
+    fn a_colour_is_stored_as_its_token_name_in_text() {
+        let (_dir, connection) = store();
+        if let Err(e) = insert(&connection, "first", "a value", Colour::Pink) {
+            panic!("the insert should succeed: {e}");
+        }
+
+        let stored: String =
+            match connection.query_row("SELECT colour FROM clips", [], |row| row.get(0)) {
+                Ok(stored) => stored,
+                Err(e) => panic!("the colour should be readable: {e}"),
+            };
+        assert_eq!(stored, "pink");
+        assert_eq!(rows(&connection)[0].colour, Colour::Pink);
+    }
+
+    /// A development store written by a WP-04..WP-09 build holds
+    /// `colour = 'unset'` in every row. WP-10 deletes that token, so the rows
+    /// become unreadable. The failure must be the `storage` variant
+    /// `list_clips` declares, not a panic and not a silent substitution — the
+    /// remedy is in the log line, and it is to delete `~/.fast-clip/`.
+    #[test]
+    fn a_stored_colour_this_build_cannot_interpret_is_storage_rather_than_a_panic() {
+        let (_dir, connection) = store();
+        if let Err(e) = connection.execute(
+            "INSERT INTO clips (id, label, value, colour, use_count, position)
+             VALUES (?1, 'a label', 'a value', 'unset', 0, 0)",
+            (Uuid::new_v4().as_hyphenated().to_string(),),
+        ) {
+            panic!("the fixture row should insert: {e}");
+        }
+
+        assert_eq!(list(&connection), Err(ClipError::Storage));
+        // Nothing was repaired, deleted or defaulted on the way past.
+        assert_eq!(count(&connection), Ok(1));
     }
 
     #[test]

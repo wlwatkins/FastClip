@@ -33,4 +33,11 @@ rusqlite = { version = "0.32", features = ["bundled-sqlcipher-vendored-openssl"]
 
 [dev-dependencies]
 tempfile = "3"
+# The `test` feature of the dependency already present, not a new dependency.
+# It provides `tauri::test::mock_builder`, which is the only way to invoke a
+# command through a real `invoke_handler` and assert what actually crosses the
+# seam — the command name, the argument casing, and the JSON a rejection
+# becomes. Under resolver 2 a dev-dependency feature is not enabled for
+# `cargo build`, so the shipped binary is unaffected.
+tauri = { version = "2.11.5", features = ["test"] }
 

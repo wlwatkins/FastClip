@@ -2,12 +2,39 @@
 
 @theme {
   /*
-   * Palette tokens, declared once (ADR-0006, palette.md "Tokens"). WP-10
-   * fills this in with the ratified set and deletes "unset" — see
-   * src/lib/contract/types.ts for why that token exists and why it must not
-   * ship. Its value here is a placeholder, not a designed colour.
+   * Palette tokens, declared once (ADR-0006, palette.md "Tokens"). Nine
+   * tokens, ratified at WP-10, each with its own fill and its own
+   * foreground so label text on that fill clears WCAG AA (4.5:1) — see
+   * docs/src/product/palette.md for the computed ratios. A raw hex in a
+   * class is a review finding; a component reaches these by name
+   * (`bg-clip-red`, `text-clip-red-fg`, …), never a literal value.
    */
-  --color-clip-unset: #52525b;
+  --color-clip-red: #ce2a38;
+  --color-clip-red-fg: #f5f7fa;
+  --color-clip-amber: #db994d;
+  --color-clip-amber-fg: #12151b;
+  --color-clip-lime: #b4d47d;
+  --color-clip-lime-fg: #12151b;
+  --color-clip-green: #6cd091;
+  --color-clip-green-fg: #12151b;
+  --color-clip-teal: #48cbbe;
+  --color-clip-teal-fg: #12151b;
+  --color-clip-blue: #296dbb;
+  --color-clip-blue-fg: #f5f7fa;
+  --color-clip-violet: #8050d3;
+  --color-clip-violet-fg: #f5f7fa;
+  --color-clip-pink: #c32e82;
+  --color-clip-pink-fg: #f5f7fa;
+  --color-clip-slate: #636c83;
+  --color-clip-slate-fg: #f5f7fa;
+
+  /*
+   * Row background on hover, Rail layout (palette.md "Chosen layout").
+   * Transparent at rest is Tailwind's default `bg-transparent`; this is the
+   * one non-default value the row needs, so it is a token rather than a
+   * literal `hover:bg-[#1a1f27]` in a component class.
+   */
+  --color-row-hover: #1a1f27;
 }
 
 :root {
