@@ -101,6 +101,13 @@ grepping the generated `id="..."` attributes in `docs/book/`.
 
 ## Versioning
 
-One source of truth, enforced in CI. `Cargo.toml`, `package.json` and
-`tauri.conf.json` currently disagree, and `0.1.0-1` is not valid semver.
-`devops` owns the fix.
+One source of truth, enforced in CI. `src-tauri/Cargo.toml` holds the version;
+`package.json` must match it, and `tauri.conf.json` carries no `version` key so
+Tauri inherits. `scripts/check-version.mjs` fails the build on any divergence,
+including a re-added `tauri.conf.json` version.
+
+The gate accepts any valid semver, prereleases included. `0.1.0-1` is valid
+semver and would pass it. If a prerelease is in fact unacceptable — the Tauri
+bundler is the likely reason, and no page records one — write the reason down
+before tightening the gate, because the gate is currently right and the
+constraint is not written anywhere.

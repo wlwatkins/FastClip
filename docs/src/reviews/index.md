@@ -10,6 +10,8 @@ The log is append-only. Superseding a review means writing a new one.
 | # | Topic | Verdict | Findings | Waived |
 | - | ----- | ------- | -------- | ------ |
 | 001 | Book consistency (pre-G0b) | `REWORK_ARCHITECTURE` | 11 | 0 — all fixed |
+| [002](./002-wp-02-toolchain.md) | WP-02 Toolchain and CI skeleton (G3) | `ACCEPT` | 5 minor | 0 — all fixed. G4 condition open, not waived |
+| [003](./003-wp-01-contract.md) | WP-01 Contract ratification (G0b) | `ACCEPT` | 4 (1 major, 3 minor) | 0 — all 4 carried to WP-03 and WP-07 |
 
 ## Verdicts
 

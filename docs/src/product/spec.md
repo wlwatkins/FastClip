@@ -196,13 +196,23 @@ and is offered an export first.
 **Unlocking.** With encryption on, launching FastClip shows a PIN prompt before
 any clip. Nothing is listed, searched or copied until it is entered.
 
-**Wrong PIN.** After five failures, attempts back off exponentially starting at
-30 seconds. Nothing is ever wiped — a destructive lockout turns a mistyped PIN
-into data loss, which is worse than the attack it prevents.
+**Wrong PIN.** After five failures, every further attempt waits 30 seconds. The
+wait is flat — it does not escalate and there is no ceiling, because an attacker
+able to automate the interface bypasses a UI-side delay entirely and attacks the
+wrapped key offline, so escalating the wait costs only the user who mistyped.
+Nothing is ever wiped — a destructive lockout turns a mistyped PIN into data
+loss, which is worse than the attack it prevents.
 
 **Changing the PIN** requires the current one and is instant regardless of clip
 count. **Disabling encryption** requires the PIN, then rewrites the store as
 plaintext.
+
+**Locking on demand.** With encryption on, the user can lock the store without
+quitting. Locking closes the database and discards the key from memory, so
+unlocking afterwards costs the same PIN entry as a launch. Locking is manual
+only: there is no idle timeout and no automatic lock. A lock is not a failed
+attempt and never starts a wait. Governed by
+[ADR-0010](../architecture/adr/0010-manual-lock.md).
 
 **While locked**, the application discloses nothing:
 

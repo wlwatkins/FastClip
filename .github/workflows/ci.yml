@@ -1,0 +1,102 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [refactor, main]
+  push:
+    branches: [refactor, main]
+
+# Narrowest permission that works: read the repo, nothing else. No job here
+# writes to the repo, creates a release or comments on a PR.
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  version:
+    name: Version agreement
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Cargo.toml, package.json and tauri.conf.json must agree
+        run: node scripts/check-version.mjs
+
+  rust:
+    name: Rust — fmt, clippy, test, audit
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+      - name: cargo fmt --check
+        run: cargo fmt --manifest-path src-tauri/Cargo.toml --check
+      - name: cargo clippy -D warnings
+        run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
+      - name: cargo test
+        run: cargo test --manifest-path src-tauri/Cargo.toml
+      - name: Install cargo-audit
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-audit
+      - name: cargo audit
+        run: cargo audit --file src-tauri/Cargo.lock
+
+  frontend:
+    name: Frontend — typecheck, svelte-check, vitest, build
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: svelte-check
+        run: npm run check
+      - name: Vitest
+        run: npm run test -- run
+      - name: Build
+        run: npm run build
+      - name: npm audit
+        run: npm audit --audit-level=high
+
+  sqlcipher-spike:
+    name: SQLCipher link spike (ADR-0005 evidence)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: spikes/sqlcipher-spike -> target
+      - name: Build and time the bundled SQLCipher link
+        shell: bash
+        run: |
+          cd spikes/sqlcipher-spike
+          start=$(date +%s)
+          cargo build --tests
+          end=$(date +%s)
+          echo "build_seconds=$((end - start))" | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Report debug test-binary size (not the ADR-0005 figure)
+        shell: bash
+        run: |
+          cd spikes/sqlcipher-spike
+          size_bytes=$(find target/debug/deps -maxdepth 1 -iname 'spike-*' ! -name '*.d' ! -name '*.pdb' -exec du -cb {} + | tail -1 | cut -f1)
+          {
+            echo "debug test-profile binary size (includes debug symbols, excludes .d/.pdb): ${size_bytes:-unknown} bytes"
+            echo "This is NOT the figure recorded in ADR-0005 (a release-profile delta against a no-dependency baseline, ~4.3 MiB)."
+            echo "It is a debug build of \`cargo build --tests\` from the previous step, useful only as a smoke check that the link still produces an artifact, not as a size trend."
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Open with key, write, close, reopen with key, reopen with wrong key
+        run: cargo test --manifest-path spikes/sqlcipher-spike/Cargo.toml -- --nocapture

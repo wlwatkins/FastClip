@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# Backstop: git itself runs this, whoever invoked the commit and however.
+# Catches what the Claude Code deny rules and PreToolUse hook cannot —
+# commits from a script an agent wrote, or from a language runtime's
+# subprocess call.
+#
+# The owner commits by setting the variable below. An agent has no reason to
+# know it exists, and this stops helpfulness rather than determined evasion.
+#
+#   ALLOW_COMMIT=1 git commit -m "..."
+#
+# Enable once with:  git config core.hooksPath .githooks
+
+if [ "$ALLOW_COMMIT" != "1" ]; then
+  echo "" >&2
+  echo "  Commit blocked. No AI commits on this project." >&2
+  echo "  If you are the owner:  ALLOW_COMMIT=1 git commit -m \"...\"" >&2
+  echo "" >&2
+  exit 1
+fi
+exit 0

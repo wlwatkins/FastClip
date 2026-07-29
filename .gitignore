@@ -28,3 +28,9 @@ docs/book/
 
 # Tooling
 .serena/
+
+# Spike crates build their own target directory
+spikes/**/target
+
+# Downloaded installers — fetched on demand, never committed
+tools/installers/

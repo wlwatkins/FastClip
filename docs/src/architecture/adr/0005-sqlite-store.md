@@ -96,6 +96,88 @@ time box, `rusqlite` is the fallback and the spike has paid for itself.
 Betting the security-critical component on a link nobody has demonstrated is
 the failure this requirement exists to prevent.
 
+### Spike evidence, first attempt — the crate remains open
+
+**The spike did not succeed and no crate is chosen.** The
+open-write-close-reopen-with-key-reopen-with-wrong-key cycle was never executed,
+on any crate. No build time and no binary size were measured, because no attempt
+reached a linked binary. The machine lacked the MSVC C++ build tools and a
+suitable Perl, so most of what follows is a local environment failure rather
+than a verdict on a crate. It is recorded here because two results are
+independent of that machine and one of them is binding.
+
+| Result | Status | Binding |
+| ------ | ------ | ------- |
+| `rusqlite 0.40.1` resolves `libsqlite3-sys 0.38.1`, whose `build.rs` fails to compile on stable `rustc 1.94.0`: `error[E0658]: use of unstable library feature 'cfg_select'` | **Ruled out.** A crate defect, reproducible anywhere on stable. | **Yes.** Whichever crate is chosen, **pin the version.** A bare `cargo add rusqlite` reintroduces a build failure that has nothing to do with SQLCipher and reads like one. `sea-orm` reaches `libsqlite3-sys` too, so this is not specific to `rusqlite`. |
+| `rusqlite 0.32` + `bundled-sqlcipher` fails with "Missing environment variable OPENSSL_DIR" | **Genuine cost signal**, reproducible. | It would need an OpenSSL install step in CI. |
+| `rusqlite 0.32` + `bundled-sqlcipher-vendored-openssl` vendors OpenSSL and invokes `perl ./Configure` with `no-asm`, needing neither a pre-existing OpenSSL nor NASM. It failed only on the local Perl distribution missing `Locale::Maketext::Simple`. | **Unproven hypothesis.** GitHub's `windows-latest` ships Strawberry Perl, so this path is *expected* to work there. Expected is not demonstrated. | No. Do not build on it. |
+| `sea-orm` | **Not evaluated at all.** The time box went to bisecting the `rusqlite` failures. | No. |
+
+The requirement above is unchanged: the cycle must run on `windows-latest` in
+CI before any code depends on the link. That needs the workflow committed and
+pushed, which is the owner's call.
+
+### Spike evidence, second attempt — crate chosen
+
+**Crate:** `rusqlite`, pinned to `0.32`, feature `bundled-sqlcipher-vendored-openssl`.
+
+```toml
+rusqlite = { version = "0.32", features = ["bundled-sqlcipher-vendored-openssl"] }
+```
+
+**Do not `cargo update` or bump this past `0.32` without re-running the spike.**
+`rusqlite 0.40.1` resolves `libsqlite3-sys 0.38.1`, whose `build.rs` fails on
+stable `rustc 1.94.0` with `error[E0658]: use of unstable library feature
+'cfg_select'`. That failure is a crate defect independent of SQLCipher and is
+still reproducible; it is the reason for the pin, not an incidental choice of
+version.
+
+With Strawberry Perl on `PATH` ahead of Git's Cygwin Perl, the local blocker
+from the first attempt (`Locale::Maketext::Simple` missing) is gone. The
+`no-asm` vendored-OpenSSL build ran to completion.
+
+**Cycle proven, locally, on this machine:** open an encrypted database with a
+key, write a row, close, reopen with the same key, read it back, reopen with
+the wrong key, confirm the read fails. Two independent test files exercise
+this — `spikes/sqlcipher-spike/tests/spike.rs`
+(`write_close_reopen_with_correct_key_reads_back`,
+`reopen_with_wrong_key_fails_to_read`) — both pass.
+
+| Measurement | Result |
+| ----------- | ------ |
+| Cold build (`cargo test`, empty `target/`, `test` profile) | 15 m 52 s |
+| Warm build (`cargo test` rerun, no source change) | 3 s |
+| Cold build (`cargo build --release`) | 16 m 19 s |
+| Binary size impact | A no-op `println!` binary linking `rusqlite` + `bundled-sqlcipher-vendored-openssl` is 4,674,048 bytes (release, stripped by default profile settings only — no explicit `strip`). A no-dependency `println!` baseline binary is 129,536 bytes. Delta: **~4.3 MiB** attributable to the vendored SQLCipher/OpenSSL static link. |
+
+**This evidence is from a local Windows 11 machine (`rustc 1.94.0`, MSVC 14.44
+via VS 2026 Professional, Strawberry Perl 5.42.2), not from `windows-latest` in
+GitHub Actions.** The requirement above — that the cycle run in CI before any
+application code depends on the link — is **still open**. What still needs
+confirming there specifically:
+
+- That `windows-latest`'s preinstalled Strawberry Perl (not Cygwin's) is what
+  `cargo` picks up by default, without a `PATH` workaround.
+- That the MSVC toolchain preinstalled on `windows-latest` links the vendored
+  OpenSSL and SQLCipher without the local machine's specific VS 2026 install.
+- Cold and warm build times under CI's actual hardware and network, with and
+  without a cached `~/.cargo` registry and `target/`, since the ~16-minute cold
+  numbers above make an uncached Rust CI job impractical.
+
+`sea-orm` was not evaluated in this attempt either, and ADR-0005's original
+order made `rusqlite` the fallback only if `sea-orm` failed the time box — a
+comparison that was never run, since the time box went to reproducing the
+cycle on `rusqlite` after the first attempt ruled out `rusqlite 0.40.1`. The
+crate choice above rests on the architect's WP-01 argument at line 83 plus
+this `rusqlite`-only feasibility spike, not on a head-to-head comparison
+against `sea-orm`.
+
+**Nothing in the [contract](../contract.md) or the
+[storage design](../storage.md) depends on the answer**, and both were ratified
+at G0b without it. Two things are downstream of it and both are named in the
+[storage design](../storage.md): whether the bundled SQLite is new enough for
+`STRICT` tables, and the build-time and binary-size cost of the C compile.
+
 ## Rejected
 
 **Encrypted JSON, whole-file.** Simpler, no C dependency, hand-readable when

@@ -71,11 +71,35 @@ You are the **orchestrator** — the session the owner talks to. You do not writ
 production code. You dispatch agents, hold context across gates, adjudicate
 disagreements, and you are the only one who reports to the owner.
 
+**You do not commit either.** "Landing" a work package means the artifacts are
+on disk and the gate is recorded — it does not mean writing git history. See
+below.
+
 Agent definitions are in `.claude/agents/`. Ownership is exclusive:
 `frontend-dev` never edits Rust, `backend-dev` never edits Svelte. A change
 spanning the seam goes through `architect` first.
 
 Gates, exit artifacts and current position: `docs/src/process/pipeline.md`.
+
+## No AI commits — binding, no exceptions
+
+**No agent and no orchestrator runs a git command that writes.** Not `commit`,
+`add`, `push`, `stash`, `reset`, `rebase`, `merge`, `tag`, `checkout`, nor
+`gh pr create` or `gh release`. Not via a script, not via `git -C <path>`, not
+via a language runtime's subprocess call.
+
+The owner writes every commit. An agent that believes a commit is needed says
+so and stops.
+
+Read-only git is encouraged: `git status`, `git diff`, `git log`, `git show`.
+Knowing what changed is the point; changing what is recorded is not.
+
+`.claude/settings.json` denies these commands and a `PreToolUse` hook blocks
+variants, but **neither is a security boundary** — subagents are documented to
+bypass deny rules, and prefix matching misses `git -C . commit`. A
+`pre-commit` git hook is the backstop, because git enforces it whoever calls
+it. The instruction above is what actually does the work; the rest catches
+accidents.
 
 ## Stack
 

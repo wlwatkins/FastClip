@@ -45,7 +45,7 @@ deliverable; an ad hoc process teaches nothing reusable.
 | Gate | Status |
 | ---- | ------ |
 | G0a Product | Accepted — [specification](../product/spec.md) |
-| G0b Design | In progress — `architect` closing [six open questions](../architecture/contract.md) |
+| G0b Design | **Landed** — [contract §6](../architecture/contract.md) is empty; `critic` returned `ACCEPT` on the fourth review ([003](../reviews/003-wp-01-contract.md)). Four findings carried to WP-03 and WP-07 |
 | G1 Build | Blocked on G0b |
 | G2 Test | Blocked |
 | G3 Review | Blocked |

@@ -56,7 +56,10 @@ reading this page.
 
 - Zero tests. No test runner in either ecosystem.
 - No CI. Nothing prevents a broken commit landing.
-- `version = "0.1.0-1"` is not valid semver, `package.json` has no version, and
-  neither agrees with `tauri.conf.json`.
+- Three version declarations disagreed: `Cargo.toml` said `0.1.0-1`,
+  `package.json` had none, and neither agreed with `tauri.conf.json`. Fixed by
+  WP-02, which settled on `Cargo.toml` as the source of truth. Note that
+  `0.1.0-1` **is** valid semver — `1` is a legal prerelease identifier — so an
+  earlier claim here that it was not was wrong. The disagreement was the defect.
 - Three inert fields (`icon`, `visible`, `clear_time`) serialised to disk and
   read by nothing. Removed by [spec §3](../product/spec.md#3-data-model).

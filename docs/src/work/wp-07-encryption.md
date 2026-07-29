@@ -42,8 +42,16 @@ hand-rolled read-decrypt-write — a process killed mid-conversion leaves a
 readable database in one state or the other, never half-converted.
 
 Track lock state and return `locked` from every clip-touching command while
-locked. After five wrong PINs, back off exponentially from 30 seconds.
-**Never wipe anything after failed attempts.**
+locked. After five wrong PINs, every further attempt waits a flat 30 seconds —
+no escalation, no ceiling. **Never wipe anything after failed attempts.**
+
+Implement `lock` per [contract §2](../architecture/contract.md#2-commands) and
+the "Locking on demand" section of the
+[storage design](../architecture/storage.md). Take the connection mutex first
+and read lock state second. Close the database and zeroise the DEK rather than
+flipping a boolean, so `unlock` afterwards is the launch path exactly. Rebuild
+the tray before returning. Locking never fails on I/O — a failed checkpoint or
+close is absorbed, and the DEK is zeroised regardless.
 
 Never log the PIN, the DEK, the salt, or any wrapped blob.
 
@@ -58,6 +66,10 @@ The launch PIN prompt. Nothing is listed, searched or copied until it is
 entered. Handle `locked` on every command, not only at launch.
 
 Wrong-PIN and backoff states with the attempts remaining and the wait.
+
+The manual lock control, hidden when `encryption_enabled` is false. On
+`locked: true` from any source, discard the clip list, close any open form and
+clear the search query, and ignore any `update_clips` that arrives afterwards.
 
 ### backend-dev — tray
 
@@ -80,6 +92,13 @@ the clips readable and invalidates the old PIN.
 
 While locked: no command returns a label or a value, and the tray exposes no
 clip name.
+
+Manual lock: locking while unlocked leaves no command returning a label or
+value and the tray showing only *Unlock FastClip*; locking while already locked
+succeeds; locking with encryption off returns `wrong_state`; a mutation issued
+concurrently with a lock either commits in full or returns `locked`, never
+half; after a lock, the process cannot read the store until the PIN is
+re-entered.
 
 Encryption off is the default on a fresh install, and that path is unchanged
 from WP-03.
@@ -104,6 +123,48 @@ Weight this package hardest.
 - A locked FastClip discloses no label or value anywhere.
 - Five wrong PINs back off; nothing is destroyed.
 - Enable, disable and change-PIN are each crash-safe.
+- A manual lock discloses nothing, in the window or the tray, and the process
+  cannot read the store until the PIN is re-entered.
+
+## Carried from review 003
+
+[Review 003](../reviews/003-wp-01-contract.md) accepted the contract with four
+findings carried rather than fixed in a fifth round. Three land here, and the
+`architect` writes the missing sentences into
+[storage](../architecture/storage.md) as part of this dispatch, before
+`backend-dev` implements the steps.
+
+**F2 [minor] — the conversion abort deletes `clips.db.new` with no requirement to
+close the connection step 3 opened.** Reachable when `disable_encryption` fails
+step 3's verification, which is the case that step exists to catch. Abort runs
+before step 4's close, and deleting a file with a live SQLite handle fails on
+Windows with a sharing violation — leaving a complete plaintext copy of every
+label and value beside an encrypted `clips.db` for the session, while the user is
+told the operation failed and still believes the store is encrypted. The natural
+Rust structure drops the connection first; the document specifies this
+handle-and-delete interaction at step 5 and is silent here.
+
+**F3 [minor] — abort is enumerated as reachable at steps 1 to 5; a failed rename
+at step 6 is a sixth.** `storage.md:755-756` covers it and the abort section's own
+enumeration does not, so two statements disagree about step 6. The harmful branch
+— setting the classification to `encrypted` without checking the rename, then
+letting step 8's unconditional emission report encryption over a plaintext store
+— needs a deliberately discarded `Result`.
+
+**F4 [minor, and re-routed here] — `lock` step 5's tray rebuild has no defined
+outcome.** Steps 3 and 4 absorb their failures by name; step 5 is not in that
+set, and both available behaviours break a stated rule. Absorb, and the tray
+keeps listing clip labels over a locked store — acceptance criterion 10 breached
+in the one surface the contract says breaches it exactly as the window would.
+Report, and `lock`'s error set is stated in full as `wrong_state { encrypted }`,
+so the only route is `internal`, contradicting ADR-0010's "Once locking begins it
+cannot fail".
+
+Review 003 routed F4 to WP-03. It is here instead: `lock` does not exist until
+encryption does, and this package already owns both `lock` and the
+tray-while-locked surface. The finding is **stated as a prediction** — whether
+Tauri 2's tray menu setter is fallible was not observable from a static read. If
+it is infallible, F4 is void; confirm that before writing the sentence.
 
 ## Risks
 

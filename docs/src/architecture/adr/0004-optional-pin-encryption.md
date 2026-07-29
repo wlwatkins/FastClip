@@ -1,7 +1,10 @@
 # ADR 0004 — Optional PIN-gated encryption
 
 **Status:** Accepted. Supersedes the encryption decision in
-[ADR-0002](./0002-threat-model.md); that ADR's IPC reasoning still stands.
+[ADR-0002](./0002-threat-model.md); that ADR's IPC reasoning still stands. The
+**backoff** consequence below is superseded by
+[ADR-0011](./0011-flat-backoff.md), which makes the wait a flat 30 seconds;
+everything else here stands.
 **Deciders:** owner
 
 ## Context
@@ -66,10 +69,13 @@ guesses worthless to someone holding only the file.
 | Encryption off (default) | unencrypted SQLite | opens straight to the clip list |
 | Encryption on | SQLCipher-encrypted SQLite | PIN prompt before any clip is shown |
 
-Wrong PIN attempts get exponential backoff after the fifth, starting at 30
-seconds and doubling. **Nothing is ever wiped after failed attempts** — a
-destructive lockout turns a mistyped PIN into data loss, which is a worse
-outcome than the attack it would prevent.
+Wrong PIN attempts get a backoff after the fifth. ⚠️ This ADR specified
+exponential backoff starting at 30 seconds and doubling;
+[ADR-0011](./0011-flat-backoff.md) supersedes that with a **flat 30 seconds**,
+and the sentence is left here rather than edited so the change is visible.
+**Nothing is ever wiped after failed attempts** — a destructive lockout turns a
+mistyped PIN into data loss, which is a worse outcome than the attack it would
+prevent. That part is unaffected.
 
 ## What this does not protect against
 

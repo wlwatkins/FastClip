@@ -72,6 +72,27 @@ partially written, or reordered?
 - No `unwrap()` or `expect()` reachable after startup.
 - `surrealdb` is gone.
 
+## Carried from review 003
+
+[Review 003](../reviews/003-wp-01-contract.md) accepted the contract with four
+findings carried rather than fixed in a fifth round. One lands here, and the
+`architect` writes the missing sentence into
+[storage](../architecture/storage.md) as part of this dispatch, before
+`backend-dev` implements the step.
+
+**F1 [major] — startup recovery step 5's `keyfile` delete has no defined failure
+behaviour.** Steps 1, 2, 6 and 7 each state what their own failure does; step 5
+does not. The idiomatic `?` makes startup record the fault, so `get_lock_state`
+returns `storage` and the user meets a failure screen over an intact plaintext
+store — and that message points at import, which is how a user replaces a store
+that was never damaged. The section that would grant the delete non-fatality
+(`storage.md:302-304`) still names step 4, which after a round-three renumbering
+deletes nothing.
+
+Decide and write down whether a failed step 5 delete is absorbed or fatal. The
+same review's F4 is carried to [WP-07](./wp-07-encryption.md) instead of here,
+because it concerns `lock`, which does not exist until encryption does.
+
 ## Risks
 
 The C build. A bundled SQLCipher compile is the slowest thing in CI and the

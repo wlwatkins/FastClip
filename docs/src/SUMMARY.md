@@ -21,6 +21,11 @@
   - [0004 — Optional PIN-gated encryption](./architecture/adr/0004-optional-pin-encryption.md)
   - [0005 — SQLite via SQLCipher](./architecture/adr/0005-sqlite-store.md)
   - [0006 — Tailwind as the styling system](./architecture/adr/0006-tailwind.md)
+  - [0007 — List order representation](./architecture/adr/0007-list-order-representation.md)
+  - [0008 — use_count stays backend-side](./architecture/adr/0008-use-count-stays-backend-side.md)
+  - [0009 — Durability level](./architecture/adr/0009-durability-level.md)
+  - [0010 — Manual lock](./architecture/adr/0010-manual-lock.md)
+  - [0011 — Flat backoff](./architecture/adr/0011-flat-backoff.md)
 
 # Process
 
@@ -44,11 +49,14 @@
   - [WP-10 Palette and accessibility](./work/wp-10-palette.md)
   - [WP-11 Copy deck and README](./work/wp-11-copy-deck.md)
   - [WP-13 Search and filter](./work/wp-13-search.md)
+  - [WP-14 Settings and window state](./work/wp-14-settings.md)
   - [WP-12 Release pipeline](./work/wp-12-release.md)
 
 # Reviews
 
 - [Review log](./reviews/index.md)
+  - [002 — WP-02 Toolchain and CI skeleton](./reviews/002-wp-02-toolchain.md)
+  - [003 — WP-01 Contract ratification](./reviews/003-wp-01-contract.md)
 
 # Reference
 

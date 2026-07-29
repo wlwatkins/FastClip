@@ -49,6 +49,15 @@ no token is stored as hex.
 - The token table, including the default token, is filled in.
 - A contrast test passes for every token.
 - Every control is reachable and operable from the keyboard.
+- **The provisional `"unset"` token is removed** from `COLOUR_TOKENS`, from the
+  Rust enum and from the Tailwind theme, and a test asserts it is absent.
+
+The last item is the exit criterion for the placeholder WP-04 ships on
+([contract §1](../architecture/contract.md#1-data-types)). Filling the token
+table does not remove `"unset"`, and the contrast test iterates the palette
+table, which never contained it — so without an explicit check a release can
+ship a validator and an enum that both accept a colour whose appearance was
+never designed.
 
 ## Risks
 

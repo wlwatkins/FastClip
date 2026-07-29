@@ -14,9 +14,10 @@ Create the GitHub Actions workflow on a `windows-latest` runner. Rust checks:
 checks: typecheck, `svelte-check`, `vitest run`, build. Cache the Cargo
 registry and target directory.
 
-Fix versioning: `Cargo.toml` says `0.1.0-1`, which is not valid semver,
-`package.json` has no version, and neither agrees with `tauri.conf.json`. Pick
-one source of truth and enforce agreement in CI.
+Fix versioning: `Cargo.toml` says `0.1.0-1`, `package.json` has no version, and
+neither agrees with `tauri.conf.json`. The three disagreeing is the defect —
+`0.1.0-1` is itself valid semver. Pick one source of truth and enforce agreement
+in CI.
 
 Add `cargo audit` and `npm audit`.
 
