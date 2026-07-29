@@ -1,10 +1,25 @@
 name: CI
 
+# Manual only. The repository has no GitHub Actions credits, so automatic runs
+# on push and pull_request are disabled rather than left to fail or to spend
+# credits that do not exist. The workflow itself is correct and was proven on
+# windows-latest: restore the `pull_request` and `push` triggers below when
+# credits are available, and nothing else needs to change.
+#
+#  pull_request:
+#    branches: [refactor, main]
+#  push:
+#    branches: [refactor, main]
+#
+# Until then the same gates run locally, and .githooks/ is where they are
+# enforced:
+#   cargo fmt --manifest-path src-tauri/Cargo.toml --check
+#   cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
+#   cargo test --manifest-path src-tauri/Cargo.toml
+#   node scripts/check-version.mjs && node scripts/check-lockfile.mjs
+#   npm run typecheck && npm run check && npm run test -- run && npm run build
 on:
-  pull_request:
-    branches: [refactor, main]
-  push:
-    branches: [refactor, main]
+  workflow_dispatch:
 
 # Narrowest permission that works: read the repo, nothing else. No job here
 # writes to the repo, creates a release or comments on a PR.

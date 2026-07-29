@@ -1,43 +1,53 @@
-use std::sync::Arc;
+//! FastClip's backend.
+//!
+//! The IPC surface is defined by `docs/src/architecture/contract.md` and is
+//! implemented in WP-05 onward. This package (WP-03) provides the store the
+//! commands will run against.
 
-use anyhow::Result;
-use lazy_static::lazy_static;
-use tauri::AppHandle;
-use tokio::sync::Mutex;
-use commands::{get_clips, new_clip, update_clip, del_clip};
+pub mod error;
+pub mod storage;
 
-mod structures;
-mod commands;
+pub use error::ClipError;
+pub use storage::Store;
 
-lazy_static! {
-    pub static ref APP_HANDLE: Arc<Mutex<Option<AppHandle>>> = Arc::new(Mutex::new(None));
-}
-
+use tauri::{Manager, RunEvent};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
-pub async fn run() -> Result<()> {
-    tauri::Builder::default()
+pub fn run() {
+    let builder = tauri::Builder::default()
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
-            let app_handle = app.handle().clone(); // Clone `AppHandle` before moving it
-            let global_handle = APP_HANDLE.clone();
-            
-            tauri::async_runtime::spawn(async move {
-                let mut handle_lock = global_handle.lock().await;
-                *handle_lock = Some(app_handle); // Store cloned handle
-            });
-
+            // Startup recovery runs here, before the event loop serves the
+            // webview, so no command can be invoked against a store that has not
+            // been recovered. The pre-refactor build populated its global handle
+            // inside a task spawned from `setup` and lost that race.
+            //
+            // The store is Tauri-managed state rather than a `lazy_static`
+            // singleton, so a test can build one over a temporary directory.
+            app.manage(Store::open_default());
             Ok(())
-        })
-        .invoke_handler(tauri::generate_handler![
-            new_clip,
-            update_clip,
-            get_clips,
-            del_clip
-            ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        });
+    // WP-05 registers the command surface here with `invoke_handler`. There is
+    // no handler yet: the pre-refactor commands were removed with the type they
+    // operated on, and the contract renames all four of them.
 
-    Ok(())
+    let app = match builder.build(tauri::generate_context!()) {
+        Ok(app) => app,
+        Err(error) => {
+            log::error!("FastClip could not start: {error}");
+            return;
+        }
+    };
+
+    app.run(|handle, event| {
+        if let RunEvent::Exit = event {
+            // Checkpoint the WAL and close, so the sidecars do not outlive the
+            // process. A failure here is absorbed; the committed data is in the
+            // WAL either way (ADR-0009).
+            if let Some(store) = handle.try_state::<Store>() {
+                store.shutdown();
+            }
+        }
+    });
 }
