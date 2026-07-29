@@ -1,6 +1,6 @@
 [package]
 name = "fast-clip"
-version = "0.1.0-a"
+version = "0.1.0-1"
 description = "A Tauri App"
 authors = ["you"]
 edition = "2021"
@@ -15,18 +15,18 @@ name = "fast_clip_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
-tauri-build = { version = "2", features = [] }
+tauri-build = { version = "2.6.3", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = [] }
-tauri-plugin-opener = "2"
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-tauri-plugin-clipboard-manager = "2.2.1"
-tokio = { version = "1.43.0", features = ["full"] }
-anyhow = "1.0.95"
+tauri = { version = "2.11.5", features = [] }
+tauri-plugin-opener = "2.5.4"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"
+tauri-plugin-clipboard-manager = "2.3.2"
+tokio = { version = "1.53.1", features = ["full"] }
+anyhow = "1.0.104"
 lazy_static = "1.5.0"
-uuid = { version = "1.13.1", features = ["serde", "v4"] }
-surrealdb = "2.2.0"
+uuid = { version = "1.24.0", features = ["serde", "v4"] }
+surrealdb = "3.2.3"
 dirs = "6.0.0"
 

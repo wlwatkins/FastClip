@@ -1,0 +1,51 @@
+# Summary
+
+[Introduction](./introduction.md)
+
+---
+
+# Product
+
+- [Specification](./product/spec.md)
+- [Colour palette](./product/palette.md)
+- [User-facing copy](./product/copy.md)
+
+# Architecture
+
+- [IPC contract](./architecture/contract.md)
+- [Storage and encryption](./architecture/storage.md)
+- [Decision records](./architecture/adr/index.md)
+  - [0001 — Plain Svelte, not SvelteKit](./architecture/adr/0001-plain-svelte-not-sveltekit.md)
+  - [0002 — Threat model and security scope](./architecture/adr/0002-threat-model.md)
+
+# Process
+
+- [The agent team](./process/team.md)
+- [The gated pipeline](./process/pipeline.md)
+- [Reporting templates](./process/reporting.md)
+- [Conventions](./process/conventions.md)
+
+# Work
+
+- [Work packages](./work/index.md)
+  - [WP-01 Contract ratification](./work/wp-01-contract.md)
+  - [WP-02 Toolchain and CI skeleton](./work/wp-02-toolchain.md)
+  - [WP-03 Storage: ordered and crash-safe](./work/wp-03-storage.md)
+  - [WP-04 Frontend scaffold](./work/wp-04-frontend-scaffold.md)
+  - [WP-05 Clip list, copy, CRUD](./work/wp-05-crud.md)
+  - [WP-06 Reordering](./work/wp-06-reorder.md)
+  - [WP-07 Encryption and migration](./work/wp-07-encryption.md)
+  - [WP-08 Tray icon](./work/wp-08-tray.md)
+  - [WP-09 Export and import](./work/wp-09-export-import.md)
+  - [WP-10 Palette and accessibility](./work/wp-10-palette.md)
+  - [WP-11 Copy deck and README](./work/wp-11-copy-deck.md)
+  - [WP-12 Release pipeline](./work/wp-12-release.md)
+
+# Reviews
+
+- [Review log](./reviews/index.md)
+
+# Reference
+
+- [Inherited debt](./reference/debt.md)
+- [Glossary](./reference/glossary.md)

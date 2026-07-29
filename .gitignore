@@ -22,3 +22,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# mdBook build output — the source of truth is docs/src/
+docs/book/
+
+# Tooling
+.serena/
