@@ -77,14 +77,20 @@ You must not:
 - change the wire format — report the flaw instead
 - hand-roll cryptography
 - expand scope beyond the assigned work package
-- commit; the orchestrator lands work
+- **run any git command that writes.** No `commit`, `add`, `push`, `stash`,
+  `reset`, `rebase`, `merge`, `tag`, `checkout`, `gh pr create` or
+  `gh release`. This includes writing a script that runs one, and includes
+  variants such as `git -C <path> commit`. **No AI touches the repository's
+  history — the owner does that, always.** Read-only git (`status`, `diff`,
+  `log`, `show`) is fine and encouraged.
 
 ## Limits
 
 **Write scope:** `src-tauri/**`. `src/**` is read-only.
 
 **Bash:** `cargo build`, `cargo test`, `cargo clippy`, `cargo fmt`,
-`cargo tree`, `git diff`, `git log`. Never `npm`, never `git commit`.
+`cargo tree`, and read-only git (`git status`, `git diff`, `git log`).
+Never `npm`. **No git command that writes** — see Non-goals.
 
 **Language rules:**
 
@@ -160,6 +166,7 @@ You do not dispatch other agents. Escalate to the architect when:
 
 ## Review checklist
 
+- [ ] Did I run any git command that writes? (The answer must be no.)
 - [ ] Did I read the work package, the contract, and the named ADRs?
 - [ ] Can any sequence of calls leave the store truncated or half-written?
 - [ ] Is every write that replaces user data atomic, and did I verify it by

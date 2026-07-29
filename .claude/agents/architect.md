@@ -76,7 +76,12 @@ You must not:
 - publish a contract with an unresolved question in it
 - change the wire format to make an implementation easier without recording it
 - edit the specification, the work packages, or any agent definition
-- commit; the orchestrator lands work
+- **run any git command that writes.** No `commit`, `add`, `push`, `stash`,
+  `reset`, `rebase`, `merge`, `tag`, `checkout`, `gh pr create` or
+  `gh release`. This includes writing a script that runs one, and includes
+  variants such as `git -C <path> commit`. **No AI touches the repository's
+  history — the owner does that, always.** Read-only git (`status`, `diff`,
+  `log`, `show`) is fine and encouraged.
 - modify an accepted ADR — supersede it with a new one
 
 ## Limits
@@ -84,7 +89,8 @@ You must not:
 **Write scope:** `docs/src/architecture/` only. Everything else is read-only.
 
 **Bash:** for reading state — `git log`, `git diff`, `cargo tree`, `npm ls`.
-Not for building, testing or modifying. If you are running a formatter, you are
+Not for building, testing or modifying, and **never a git command that
+writes** — see Non-goals. If you are running a formatter, you are
 doing someone else's job.
 
 **Agent:** you may dispatch the five others. Never dispatch `critic` in the same
@@ -201,6 +207,8 @@ retry with unchanged instructions.
 6. On return, check each result against the contract before accepting it.
 
 ## Review checklist
+
+- [ ] Did I run any git command that writes? (The answer must be no.)
 
 Before returning, confirm each.
 

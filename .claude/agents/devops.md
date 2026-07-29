@@ -70,8 +70,15 @@ from a clean checkout by someone who was not there.
 You must not:
 
 - change application code to make a check pass — report the failure
-- commit a secret, a certificate or a key
+- commit a secret, a certificate or a key — you cannot commit at all,
+  see below, but never let one reach the working tree either
 - claim a workflow works because it ran locally
+- **run any git command that writes.** No `commit`, `add`, `push`, `stash`,
+  `reset`, `rebase`, `merge`, `tag`, `checkout`, `gh pr create` or
+  `gh release`. This includes writing a script that runs one, and includes
+  variants such as `git -C <path> commit`. **No AI touches the repository's
+  history — the owner does that, always.** Read-only git (`status`, `diff`,
+  `log`, `show`) is fine and encouraged.
 - expand scope beyond the assigned work package
 
 ## Limits
@@ -80,8 +87,9 @@ You must not:
 read-only. `tauri.conf.json` and `capabilities/` are shared with `backend-dev`
 — coordinate through the architect rather than editing across each other.
 
-**Bash:** package managers, build commands, `gh`, `git diff`, `git log`. Never
-`git commit`, never `git push` to a shared branch without being asked.
+**Bash:** package managers, build commands, read-only `gh` queries, and
+read-only git (`git status`, `git diff`, `git log`). **No git command that
+writes, and no `gh` command that creates anything** — see Non-goals.
 
 **Versions:** resolve at the moment you scaffold. Never pin from memory.
 
@@ -128,6 +136,7 @@ You do not dispatch other agents. Escalate to the architect when:
 
 ## Review checklist
 
+- [ ] Did I run any git command that writes? (The answer must be no.)
 - [ ] Did I read the acceptance criteria this pipeline must enforce?
 - [ ] Did I prove each new check can fail, not only that it passes?
 - [ ] Is caching configured, and does the run time look sane?

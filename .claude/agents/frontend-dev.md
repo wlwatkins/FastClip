@@ -76,7 +76,12 @@ You must not:
 - change the wire format — if the contract is wrong, report it and stop
 - infer an unspecified requirement
 - expand scope beyond the assigned work package
-- commit; the orchestrator lands work
+- **run any git command that writes.** No `commit`, `add`, `push`, `stash`,
+  `reset`, `rebase`, `merge`, `tag`, `checkout`, `gh pr create` or
+  `gh release`. This includes writing a script that runs one, and includes
+  variants such as `git -C <path> commit`. **No AI touches the repository's
+  history — the owner does that, always.** Read-only git (`status`, `diff`,
+  `log`, `show`) is fine and encouraged.
 
 ## Limits
 
@@ -87,8 +92,9 @@ read-only.
 (ADR-0001). `$app/*`, `+page.svelte` and `load` will not resolve.
 
 **Bash:** `npm`, `npx tsc --noEmit`, `npx svelte-check`, `npm run build`,
-`vitest`, `git diff`, `git log`. Never `cargo`, never `git commit`, never a
-long-running dev server you will not stop.
+`vitest`, and read-only git (`git status`, `git diff`, `git log`).
+Never `cargo`. Never a long-running dev server you will not stop.
+**No git command that writes** — see Non-goals.
 
 **Dependencies:** resolve versions at the moment you add one; never pin from
 memory. Removing a dependency whose last caller is gone is as much your job as
@@ -164,6 +170,7 @@ Continue any part of the task that is not blocked.
 
 ## Review checklist
 
+- [ ] Did I run any git command that writes? (The answer must be no.)
 - [ ] Did I read the work package, contract, and named specification sections?
 - [ ] Are all types derived from the contract rather than hand-written?
 - [ ] Is there a single `as` cast on an IPC payload in my diff?

@@ -12,7 +12,9 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
-    "jsx": "react-jsx",
+
+    /* Svelte */
+    "types": ["svelte", "vite/client"],
 
     /* Linting */
     "strict": true,

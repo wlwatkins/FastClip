@@ -59,6 +59,8 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      - name: package.json and package-lock.json must be in sync
+        run: node scripts/check-lockfile.mjs
       - run: npm ci
       - name: Typecheck
         run: npm run typecheck
@@ -80,9 +82,20 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: spikes/sqlcipher-spike -> target
+      - name: Verify Strawberry Perl wins over Git Bash's MSYS Perl
+        shell: bash
+        run: |
+          export PATH="/c/Strawberry/perl/bin:$PATH"
+          perl -v
+          case "$(perl -e 'print $^O')" in
+            MSWin32) echo "perl is Strawberry (MSWin32) — OK" ;;
+            *) echo "perl reports '$(perl -e 'print $^O')', not MSWin32 — Strawberry Perl was not put first on PATH" >&2; exit 1 ;;
+          esac
+          perl -MLocale::Maketext::Simple -e 1
       - name: Build and time the bundled SQLCipher link
         shell: bash
         run: |
+          export PATH="/c/Strawberry/perl/bin:$PATH"
           cd spikes/sqlcipher-spike
           start=$(date +%s)
           cargo build --tests
@@ -91,6 +104,7 @@ jobs:
       - name: Report debug test-binary size (not the ADR-0005 figure)
         shell: bash
         run: |
+          export PATH="/c/Strawberry/perl/bin:$PATH"
           cd spikes/sqlcipher-spike
           size_bytes=$(find target/debug/deps -maxdepth 1 -iname 'spike-*' ! -name '*.d' ! -name '*.pdb' -exec du -cb {} + | tail -1 | cut -f1)
           {
@@ -99,4 +113,7 @@ jobs:
             echo "It is a debug build of \`cargo build --tests\` from the previous step, useful only as a smoke check that the link still produces an artifact, not as a size trend."
           } | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Open with key, write, close, reopen with key, reopen with wrong key
-        run: cargo test --manifest-path spikes/sqlcipher-spike/Cargo.toml -- --nocapture
+        shell: bash
+        run: |
+          export PATH="/c/Strawberry/perl/bin:$PATH"
+          cargo test --manifest-path spikes/sqlcipher-spike/Cargo.toml -- --nocapture

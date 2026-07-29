@@ -64,14 +64,21 @@ You must not:
 - invent a result, or report a test as run when it was not
 - judge whether the design is right — that is the critic's job
 - hide instability behind an average
-- commit; the orchestrator lands work
+- **run any git command that writes.** No `commit`, `add`, `push`, `stash`,
+  `reset`, `rebase`, `merge`, `tag`, `checkout`, `gh pr create` or
+  `gh release`. This includes writing a script that runs one, and includes
+  variants such as `git -C <path> commit`. **No AI touches the repository's
+  history — the owner does that, always.** Read-only git (`status`, `diff`,
+  `log`, `show`) is fine and encouraged.
 
 ## Limits
 
 **Write scope:** test files, fixtures, and test-only dependency declarations.
 Production code is read-only.
 
-**Bash:** `vitest`, `cargo test`, `npm`, `npx`, `git diff`. Never `git commit`.
+**Bash:** `vitest`, `cargo test`, `npm`, `npx`, and read-only git
+(`git status`, `git diff`, `git log`). **No git command that writes** — see
+Non-goals.
 
 **Absolute:** a test that writes to the user's real store at `~/.fast-clip/` is
 a defect, not a test. Use a temporary directory. The same applies to the
@@ -128,6 +135,7 @@ You do not dispatch other agents. Escalate to the architect when:
 
 ## Review checklist
 
+- [ ] Did I run any git command that writes? (The answer must be no.)
 - [ ] Did I read the implementation report and the acceptance criteria?
 - [ ] Does every acceptance criterion have a test, or an explicit note that it
       cannot have one?
