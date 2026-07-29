@@ -45,7 +45,7 @@ deliverable; an ad hoc process teaches nothing reusable.
 | Gate | Status |
 | ---- | ------ |
 | G0a Product | Accepted — [specification](../product/spec.md) |
-| G0b Design | In progress — `architect` closing [five open questions](../architecture/contract.md) |
+| G0b Design | In progress — `architect` closing [six open questions](../architecture/contract.md) |
 | G1 Build | Blocked on G0b |
 | G2 Test | Blocked |
 | G3 Review | Blocked |
@@ -54,8 +54,12 @@ deliverable; an ad hoc process teaches nothing reusable.
 ## First dispatch
 
 ```text
-Read docs/src/product/spec.md, docs/src/architecture/contract.md and both ADRs.
-Close the five open questions in the contract's §6. Where a question needs a
+Read docs/src/product/spec.md, docs/src/architecture/contract.md,
+docs/src/work/wp-01-contract.md, and every ADR in
+docs/src/architecture/adr/ — there are six, and 0004 and 0005 define the
+encryption and storage surface you are ratifying.
+
+Close the six open questions in the contract's §6. Where a question needs a
 product decision rather than an engineering one, stop and say so instead of
 answering it.
 ```

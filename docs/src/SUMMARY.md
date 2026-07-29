@@ -17,6 +17,10 @@
 - [Decision records](./architecture/adr/index.md)
   - [0001 — Plain Svelte, not SvelteKit](./architecture/adr/0001-plain-svelte-not-sveltekit.md)
   - [0002 — Threat model and security scope](./architecture/adr/0002-threat-model.md)
+  - [0003 — No legacy migration](./architecture/adr/0003-no-legacy-migration.md)
+  - [0004 — Optional PIN-gated encryption](./architecture/adr/0004-optional-pin-encryption.md)
+  - [0005 — SQLite via SQLCipher](./architecture/adr/0005-sqlite-store.md)
+  - [0006 — Tailwind as the styling system](./architecture/adr/0006-tailwind.md)
 
 # Process
 
@@ -34,11 +38,12 @@
   - [WP-04 Frontend scaffold](./work/wp-04-frontend-scaffold.md)
   - [WP-05 Clip list, copy, CRUD](./work/wp-05-crud.md)
   - [WP-06 Reordering](./work/wp-06-reorder.md)
-  - [WP-07 Encryption and migration](./work/wp-07-encryption.md)
   - [WP-08 Tray icon](./work/wp-08-tray.md)
   - [WP-09 Export and import](./work/wp-09-export-import.md)
+  - [WP-07 Optional PIN-gated encryption](./work/wp-07-encryption.md)
   - [WP-10 Palette and accessibility](./work/wp-10-palette.md)
   - [WP-11 Copy deck and README](./work/wp-11-copy-deck.md)
+  - [WP-13 Search and filter](./work/wp-13-search.md)
   - [WP-12 Release pipeline](./work/wp-12-release.md)
 
 # Reviews

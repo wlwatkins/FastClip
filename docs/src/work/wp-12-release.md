@@ -25,7 +25,9 @@ Review `src-tauri/capabilities/` for the narrowest permission set that works.
 ### test-engineer
 
 Install the built artefact on a clean machine or VM and confirm first-run
-behaviour, including the migration path from a pre-refactor install.
+behaviour: a fresh install creates `~/.fast-clip/`, starts with an empty clip
+list, and leaves any pre-refactor `%LOCALAPPDATA%\FastClip\db` untouched
+([ADR-0003](../architecture/adr/0003-no-legacy-migration.md)).
 
 ### critic
 
@@ -36,11 +38,13 @@ capability set is not broader than the app uses.
 
 - A tag produces a downloadable installer.
 - CSP is set.
-- First run on a clean machine works, including migration.
+- First run on a clean machine works, and a pre-refactor store present on that
+  machine is neither read nor modified.
 - Signing is either done or documented as blocked, with what the owner must
   provide.
 
 ## Risks
 
-The migration has only ever run in tests until this point. First-run on a real
-pre-refactor install is the first honest test of WP-07.
+The SQLCipher build is the risk. It has only run in CI until now, and a
+bundled C dependency behaves differently in a release profile than in a debug
+one. Enabling encryption on a real install is the first honest test of WP-07.

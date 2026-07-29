@@ -5,15 +5,16 @@ that works without a mouse.
 
 **Depends on:** WP-04.
 
-**Inputs:** [palette](../product/palette.md), spec §7.
+**Inputs:** [palette](../product/palette.md),
+[spec §7](../product/spec.md#7-colour).
 
 ## Work
 
 ### frontend-dev
 
 Define eight to ten tokens, each with its own fill and foreground. Fill in the
-token table and the Mantine migration map on the palette page — that page is
-the deliverable, not a side effect.
+token table on the palette page — that page is the deliverable, not a side
+effect.
 
 Requirements: WCAG AA (4.5:1) for label text on its own fill, distinguishable
 at 250px, distinguishable under common colour-vision deficiency, legible
@@ -26,9 +27,10 @@ Complete the keyboard and focus pass across every interactive element.
 
 ### backend-dev
 
-Provide the Mantine-to-token mapping used by the WP-07 migration, taken from
-the palette page. An unmappable value falls back to a default token rather than
-failing the migration.
+Validate that an incoming `colour` is a known token and reject anything else as
+`invalid_input`. No conversion logic is needed —
+[ADR-0003](../architecture/adr/0003-no-legacy-migration.md) removed the
+migration, so no stored value is ever translated.
 
 ### test-engineer
 
@@ -44,7 +46,7 @@ no token is stored as hex.
 
 ## Definition of done
 
-- The token table and migration map are filled in.
+- The token table, including the default token, is filled in.
 - A contrast test passes for every token.
 - Every control is reachable and operable from the keyboard.
 

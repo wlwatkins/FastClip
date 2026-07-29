@@ -9,18 +9,21 @@ The log is append-only. Superseding a review means writing a new one.
 
 | # | Topic | Verdict | Findings | Waived |
 | - | ----- | ------- | -------- | ------ |
-| — | *no reviews yet* | | | |
+| 001 | Book consistency (pre-G0b) | `REWORK_ARCHITECTURE` | 11 | 0 — all fixed |
 
 ## Verdicts
 
-| Verdict | Meaning |
-| ------- | ------- |
-| `PASS` | Nothing found. A legitimate and expected outcome. |
-| `PASS WITH FINDINGS` | Real issues, none blocking. The orchestrator schedules them. |
-| `BLOCK` | Security, data loss, or a contract violation. Does not merge. |
+| Verdict | Meaning | Next agent |
+| ------- | ------- | ---------- |
+| `ACCEPT` | Good enough to keep. Zero findings is a legitimate ACCEPT. | orchestrator lands it |
+| `REWORK_IMPLEMENTATION` | The design is sound; the code is not. | the developer who owns those paths |
+| `REWORK_ARCHITECTURE` | The code is faithful; the contract or design is wrong. | `architect` |
+| `REWORK_TESTS` | Inconclusive — the tests cannot support a verdict. | `test-engineer` |
+| `BLOCK` | Security, data loss, or a contract violation. Does not merge. | orchestrator decides |
 
-`BLOCK` is limited to those three categories. The critic may not block on
-style.
+This vocabulary is defined in `.claude/agents/critic.md` and must match it
+exactly. `BLOCK` is limited to those three categories; the critic may not block
+on style.
 
 ## Template
 
@@ -28,7 +31,7 @@ style.
 # Review NNN — <topic>
 
 **Reviewed:** <commit or file list>
-**Verdict:** PASS | PASS WITH FINDINGS | BLOCK
+**Verdict:** ACCEPT | REWORK_IMPLEMENTATION | REWORK_ARCHITECTURE | REWORK_TESTS | BLOCK
 
 ## Findings
 
@@ -38,13 +41,26 @@ style.
 **Failure scenario:** <concrete inputs → concrete wrong outcome>
 **Why it survives scrutiny:** <the counter-argument considered and rejected>
 
+## Failure layer
+
+specification / architecture / implementation / tests / none
+
+## Acceptance criteria
+
+| Criterion | Met | Evidence |
+|---|---|---|
+
 ## What I checked and found sound
 
-<specific, so a PASS is credible>
+<specific, so an ACCEPT is credible>
 
 ## What I could not verify
 
-<the limits of a static read; the critic cannot run builds or tests>
+<the limits of a static read; the critic has no shell>
+
+## Next action
+
+architect / frontend-dev / backend-dev / test-engineer / devops / orchestrator
 ```
 
 ## Waivers

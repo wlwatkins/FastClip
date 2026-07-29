@@ -73,8 +73,9 @@ Production code is read-only.
 
 **Bash:** `vitest`, `cargo test`, `npm`, `npx`, `git diff`. Never `git commit`.
 
-**Absolute:** a test that writes to the user's real `%LOCALAPPDATA%` store is a
-defect, not a test. Use a temporary directory.
+**Absolute:** a test that writes to the user's real store at `~/.fast-clip/` is
+a defect, not a test. Use a temporary directory. The same applies to the
+pre-refactor `%LOCALAPPDATA%\FastClip\db`, which nothing may touch at all.
 
 ## Inputs expected
 

@@ -122,7 +122,12 @@ intact.
 - **Every subscribing `$effect` returns a cleanup.** An un-unlistened Tauri
   `listen()` leaks across hot reloads.
 - **Keys are stable ids**, never array indices.
-- **One styling system.**
+- **One styling system: Tailwind.** No component library, no CSS modules. A
+  Svelte `<style>` block is a deliberate exception for what Tailwind cannot
+  express, never a parallel system. No raw hex in a class — use a palette
+  token. See `docs/src/architecture/adr/0006-tailwind.md`.
+- **Build the layout that was chosen**, recorded on the palette page. Do not
+  redesign it mid-package.
 - **No `console.log` in landed code.**
 - **Dead code does not land.** If you compute it, render it.
 

@@ -20,18 +20,18 @@ content here, because a duplicated rule is a rule that will drift.
 mdbook serve docs      # live preview, http://localhost:3000
 ```
 
-| You need                             | Read                                                            |
-| ------------------------------------ | --------------------------------------------------------------- |
-| What the app does                    | `docs/src/product/spec.md` — **read this before anything else** |
-| The frontend↔backend interface       | `docs/src/architecture/contract.md`                             |
-| Why a decision was made              | `docs/src/architecture/adr/`                                    |
-| **What is to be built, and by whom** | `docs/src/work/` — the work packages                            |
-| Who does what                        | `docs/src/process/team.md`                                      |
-| What order work happens in           | `docs/src/process/pipeline.md`                                  |
-| How to report a result               | `docs/src/process/reporting.md`                                 |
-| Commit style, code rules             | `docs/src/process/conventions.md`                               |
-| What was already broken              | `docs/src/reference/debt.md`                                    |
-| What a word means here               | `docs/src/reference/glossary.md`                                |
+| You need | Read |
+| -------- | ---- |
+| What the app does | `docs/src/product/spec.md` — **read this before anything else** |
+| The frontend↔backend interface | `docs/src/architecture/contract.md` |
+| Why a decision was made | `docs/src/architecture/adr/` |
+| **What is to be built, and by whom** | `docs/src/work/` — the work packages |
+| Who does what | `docs/src/process/team.md` |
+| What order work happens in | `docs/src/process/pipeline.md` |
+| How to report a result | `docs/src/process/reporting.md` |
+| Commit style, code rules | `docs/src/process/conventions.md` |
+| What was already broken | `docs/src/reference/debt.md` |
+| What a word means here | `docs/src/reference/glossary.md` |
 
 ## The rule everything else rests on
 
@@ -82,8 +82,8 @@ Gates, exit artifacts and current position: `docs/src/process/pipeline.md`.
 | Layer    | From                 | To                                       |
 | -------- | -------------------- | ---------------------------------------- |
 | Shell    | Tauri 2              | Tauri 2 (unchanged)                      |
-| Frontend | React 18 + Mantine 7 | Svelte 5 (runes) + Vite + TS, **no SvelteKit** |
-| Backend  | Rust, HashMap → JSON | Rust, ordered + encrypted store          |
+| Frontend | React 18 + Mantine 7 | Svelte 5 (runes) + Vite + TS + Tailwind, **no SvelteKit** |
+| Backend  | Rust, HashMap → JSON | Rust + SQLite (SQLCipher, opt-in)        |
 | Tests    | none                 | Vitest + `cargo test` + contract tests   |
 | CI       | none                 | GitHub Actions, Windows build + release  |
 

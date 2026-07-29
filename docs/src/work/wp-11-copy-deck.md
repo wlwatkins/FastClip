@@ -21,10 +21,17 @@ never reach the user.
 
 ### backend-dev
 
-Rewrite the README. The current text says **"DO NOT USE FOR PASSWORDS"**. It is
-reworded, not deleted: *clips are encrypted at rest, but FastClip is not a
-password manager and does not protect against software running under your
-account.*
+Rewrite the README. The current text says **"DO NOT USE FOR PASSWORDS"**.
+
+The claim must describe **the default, which is unencrypted**
+([ADR-0004](../architecture/adr/0004-optional-pin-encryption.md)). Encryption is
+opt-in, so a README implying clips are protected out of the box is false for
+most users. Something like: *clips are stored unencrypted unless you turn on
+PIN protection in settings. Even then, FastClip is not a password manager and
+does not protect against software running under your account.*
+
+Also fix the "Secure local storage" line, which contradicts line 44 of the same
+file.
 
 Update the feature list and remove completed to-do items.
 

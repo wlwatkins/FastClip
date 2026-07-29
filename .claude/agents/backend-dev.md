@@ -104,12 +104,15 @@ You must not:
 
 This is the part of your role that matters most.
 
-**Never write over a live file.** Any write that replaces user data goes to a
-temporary file, is flushed, then renamed. A process killed at any point leaves
-either the old state or the new one.
+**A process killed at any point leaves either the old state or the new one**,
+never something in between. The store is SQLite, so its journal provides this —
+do not hand-roll temp-file-and-rename over the top of it. For whole-database
+transitions such as enabling or disabling encryption, use the documented
+conversion path rather than read-decrypt-write.
 
-**Version the format from the first release.** A store without a version field
-cannot be migrated safely later.
+**Version the schema from the first release.** A store with no version cannot
+be migrated safely later, and this project's own schema will change even though
+it never reads pre-refactor data.
 
 **Build the migration before the feature.** Get it tested before the code it
 migrates to is finished. Losing a user's clips on upgrade is worse than the
@@ -159,7 +162,8 @@ You do not dispatch other agents. Escalate to the architect when:
 
 - [ ] Did I read the work package, the contract, and the named ADRs?
 - [ ] Can any sequence of calls leave the store truncated or half-written?
-- [ ] Does every write that replaces user data use temp-file-then-rename?
+- [ ] Is every write that replaces user data atomic, and did I verify it by
+      killing the process mid-write rather than by reasoning about it?
 - [ ] Does existing on-disk data still load after my change?
 - [ ] Is there an `unwrap()` or `expect()` reachable after startup?
 - [ ] Could any clip value reach a log line, including through a `Debug` derive?

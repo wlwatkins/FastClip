@@ -1,6 +1,8 @@
 # ADR 0002 — Threat model and the scope of security work
 
-**Status:** Accepted
+**Status:** Accepted. The encryption decision is superseded by
+[ADR-0004](./0004-optional-pin-encryption.md), which makes encryption opt-in and
+PIN-gated. Everything below about the **IPC boundary** still stands.
 **Deciders:** owner, orchestrator
 
 Read this before any security work. It exists as much to stop over-engineering
@@ -63,17 +65,20 @@ unlocked session.
 
 ## Consequences
 
-- `backend-dev` implements an AEAD-encrypted, versioned store with a migration
-  from the existing plaintext file. Losing clips on upgrade is worse than the
-  plaintext being fixed, so the migration is tested first.
-- **The README warning is reworded, not deleted.** Claiming FastClip is safe for
-  passwords would be false: a password manager defends the "code running as the
-  user" case with a passphrase that is not on the machine. Replacement text:
-  *clips are encrypted at rest, but FastClip is not a password manager and does
-  not protect against software running under your account.* Deleting the warning
-  outright overstates what was built, and the critic blocks that.
+- ~~`backend-dev` implements an AEAD-encrypted, versioned store with a
+  migration from the existing plaintext file.~~ **Superseded twice.**
+  [ADR-0003](./0003-no-legacy-migration.md) removed the migration entirely —
+  pre-refactor stores are never read.
+  [ADR-0004](./0004-optional-pin-encryption.md) made encryption opt-in, and
+  [ADR-0005](./0005-sqlite-store.md) replaced the file format with SQLite and
+  SQLCipher. Nothing in this bullet is still binding.
+- ~~**The README warning is reworded, not deleted**, to *clips are encrypted at
+  rest, but FastClip is not a password manager…*~~ **Superseded by
+  [ADR-0004](./0004-optional-pin-encryption.md).** Encryption is now opt-in and
+  off by default, so that wording is false for any user who never opens
+  settings. The README must describe the unencrypted default.
 - `println!("new_clip {:?}", clip)` in `commands.rs` is still fixed. Logging
   secrets to stdout is in scope under any threat model.
 - `"csp": null` in `tauri.conf.json` is still tightened by `devops`. It keeps
   this ADR's "no script injection" premise true by policy rather than by luck.
-- Contract open question 2 is closed.
+- Contract closed question 1 records this decision.

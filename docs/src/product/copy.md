@@ -32,12 +32,37 @@ what to do next.
 | Delete confirmation | |
 | Clip deleted | |
 
+## Search
+
+| Situation | Message |
+| --------- | ------- |
+| Search box placeholder | |
+| No clips match the query | must make clear it is a filter, not an empty library |
+| Reorder disabled while filtering | shown on hover over an inert drag handle |
+
+## Encryption and PIN
+
+| Situation | Message |
+| --------- | ------- |
+| Settings toggle label | |
+| Enable: PIN entry prompt | |
+| Enable: PIN confirmation mismatch | |
+| **Enable: irreversibility warning** | must say plainly that a forgotten PIN means the clips cannot be recovered, and offer an export first |
+| Unlock prompt at launch | |
+| Wrong PIN | includes attempts remaining |
+| Backoff active | states how long to wait |
+| Change PIN | |
+| Disable encryption confirmation | must say the store becomes plaintext |
+| Tray item while locked | "Unlock FastClip" or equivalent; must not name any clip |
+| Export unavailable while locked | |
+
 ## Failures
 
 | Situation | Message |
 | --------- | ------- |
 | Store cannot be decrypted | must point at [import](./spec.md) as the recovery path |
 | Store is from a newer version | |
+| Store cannot be opened on this machine or account | encrypted stores are account-bound; point at import |
 | Disk write failed | |
 | Import file malformed | must name what was wrong |
 | Import file unreadable | |
@@ -50,7 +75,7 @@ Both are claims about what FastClip protects. Overstating either is a
 | String | Constraint |
 | ------ | ---------- |
 | Export warning | States that the exported file is not encrypted, shown at the moment of export. |
-| README security note | "Encrypted at rest, but not a password manager; does not protect against software running under your account." Do not soften to "your clips are secure". |
+| README security note | Must describe **the default, which is unencrypted** ([ADR-0004](../architecture/adr/0004-optional-pin-encryption.md)). Along the lines of *"clips are stored unencrypted unless you turn on PIN protection in settings. Even then, FastClip is not a password manager and does not protect against software running under your account."* Do not soften to "your clips are secure", and do not claim encryption is on. |
 
 Both must match
 [ADR-0002](../architecture/adr/0002-threat-model.md).

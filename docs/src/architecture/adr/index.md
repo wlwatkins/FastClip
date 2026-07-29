@@ -13,6 +13,10 @@ writing a new ADR that supersedes it, not editing the old one.
 | - | ----- | ------ |
 | [0001](./0001-plain-svelte-not-sveltekit.md) | Plain Svelte + Vite, not SvelteKit | Accepted |
 | [0002](./0002-threat-model.md) | Threat model and the scope of security work | Accepted |
+| [0003](./0003-no-legacy-migration.md) | No migration from pre-refactor data | Accepted |
+| [0004](./0004-optional-pin-encryption.md) | Optional PIN-gated encryption | Accepted; supersedes 0002's encryption decision |
+| [0005](./0005-sqlite-store.md) | SQLite via SQLCipher as the store | Accepted; crate choice deferred to G0b |
+| [0006](./0006-tailwind.md) | Tailwind as the only styling system | Accepted |
 
 ## Template
 
@@ -40,8 +44,6 @@ the bad consequences; an ADR with no downsides listed is marketing.
 
 Listed so they are not decided silently:
 
-- storage format and AEAD choice ([storage](../storage.md))
 - how list ordering is represented
-- whether the SurrealDB dependency is used or removed
 - CSP policy for the webview
 - code-signing for the Windows installer

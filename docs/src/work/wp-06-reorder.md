@@ -4,7 +4,9 @@
 
 **Depends on:** WP-05.
 
-**Inputs:** contract, spec §4.3, the order-representation ADR from WP-01.
+**Inputs:** [contract](../architecture/contract.md),
+[spec §4.3](../product/spec.md#43-reorder), the order-representation ADR from
+[WP-01](./wp-01-contract.md).
 
 ## Work
 

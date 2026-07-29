@@ -1,11 +1,14 @@
 # WP-09 — Export and import
 
 **Objective:** the user can get their clips out and back in. This is the
-recovery path that makes the encryption work safe to ship.
+recovery path that makes the encryption work safe to ship, so it ships first.
 
-**Depends on:** WP-07.
+**Depends on:** [WP-05](./wp-05-crud.md). Export does not need encryption; it
+needs the store and the UI. [WP-07](./wp-07-encryption.md) depends on **this**
+package, not the other way round.
 
-**Inputs:** contract, spec §4.6.
+**Inputs:** [contract](../architecture/contract.md),
+[spec §4.6](../product/spec.md#46-export-and-import-json).
 
 ## Work
 

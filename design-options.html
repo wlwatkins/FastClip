@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<title>FastClip — design options v2</title>
+<style>
+  :root{
+    --page:#0e1015; --ink:#e8eaef; --muted:#98a1b0;
+    --c-slate:#6b7a90; --c-red:#d9534f; --c-amber:#c68a1a; --c-green:#3f9a63;
+    --c-teal:#2c8f8f; --c-blue:#3f7fd6; --c-violet:#7a5fd3; --c-pink:#bd5a91;
+  }
+  *{box-sizing:border-box}
+  button{padding:0;margin:0;font-family:inherit;-webkit-appearance:none;appearance:none}
+  body{margin:0;background:var(--page);color:var(--ink);padding:28px;
+       font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+  h1{font-size:19px;margin:0 0 4px}
+  .sub{color:var(--muted);margin:0 0 18px;max-width:72ch;font-size:13px}
+  .bar{display:flex;gap:8px;align-items:center;margin-bottom:22px;flex-wrap:wrap}
+  .bar button{background:#191d25;color:var(--ink);border:1px solid #272d38;
+              padding:7px 13px;border-radius:8px;cursor:pointer;font-size:13px}
+  .bar button[aria-pressed="true"]{background:#2f6fd0;border-color:#2f6fd0}
+  .bar .note{color:var(--muted);font-size:12px;margin-left:4px}
+  .grid{display:flex;flex-wrap:wrap;gap:26px}
+  .opt{width:300px}
+  .opt h2{font-size:13px;margin:0 0 3px;font-weight:600}
+  .opt p{font-size:12px;color:var(--muted);margin:0 0 10px;min-height:52px}
+  .win{width:300px;height:600px;border-radius:11px;overflow:hidden;position:relative;
+       box-shadow:0 14px 38px rgba(0,0,0,.6);display:flex;flex-direction:column}
+  svg.i{width:17px;height:17px;stroke:currentColor;fill:none;
+        stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;display:block}
+  .tb{display:flex;align-items:center;gap:2px;padding:9px 8px;flex:none}
+  .tb .grow{flex:1}
+  .tbtn{width:28px;height:28px;border-radius:7px;display:inline-flex;
+        align-items:center;justify-content:center;flex:none;
+        border:0;background:transparent;color:#8b95a5;cursor:pointer;line-height:0}
+  .tbtn:hover{background:rgba(255,255,255,.08);color:#dfe4ec}
+  .scroll{flex:1;overflow:hidden;padding:0 8px 8px}
+  .srch{padding:0 8px 8px;flex:none;position:relative}
+  .srch svg{position:absolute;left:17px;top:9px;width:15px;height:15px;color:#7b8494}
+  .srch input{width:100%;padding:8px 9px 8px 32px;border-radius:8px;font-size:13px;
+              outline:none;font-family:inherit}
+  .srch input:focus{border-color:#3f7fd6}
+  .clip{position:relative;display:flex;align-items:center;cursor:pointer;
+        width:100%;text-align:left;font:inherit;border:0;background:none;color:inherit;
+        overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+  .clip > *{flex:none}
+  .acts{position:absolute;right:0;top:0;bottom:0;display:flex;align-items:center;
+        gap:2px;padding:0 6px 0 16px;opacity:0;transition:opacity .12s;
+        pointer-events:none;border-radius:inherit}
+  .row:hover .acts,.row.hovered .acts{opacity:1;pointer-events:auto}
+  .abtn{width:26px;height:26px;border-radius:6px;display:inline-flex;
+        align-items:center;justify-content:center;flex:none;
+        border:0;background:transparent;cursor:pointer;color:#aab3c1;line-height:0}
+  .abtn svg{width:15px;height:15px}
+  .row{position:relative;margin-bottom:4px}
+  .copied{position:absolute;inset:0;display:none;align-items:center;justify-content:center;
+          font-size:12px;font-weight:600;letter-spacing:.04em;border-radius:inherit}
+  .lock{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+        gap:16px;padding:26px;text-align:center}
+  .lock .ring{width:46px;height:46px;border-radius:50%;display:grid;place-items:center;
+              border:1px solid rgba(255,255,255,.14)}
+  .lock .ring svg{width:20px;height:20px;color:#c6cdd8}
+  .pin{display:flex;gap:8px}
+  .pin i{width:28px;height:34px;border-radius:7px;display:block}
+  .lmsg{font-size:12px;color:var(--muted);max-width:190px;line-height:1.45}
+
+  /* 1 RAIL */
+  .a{background:#111419}
+  .a .tb{border-bottom:1px solid #1d222b}
+  .a .clip{padding:9px 62px 9px 13px;border-radius:7px}
+  .a .clip::before{content:"";position:absolute;left:4px;top:8px;bottom:8px;width:3px;
+                   border-radius:2px;background:var(--c)}
+  .a .row:hover .clip{background:#1a1f27}
+  .a .row.hovered .clip{background:#1a1f27}
+  .a .acts{background:linear-gradient(90deg,rgba(26,31,39,0),#1a1f27 30%)}
+  .a .abtn:hover{background:#232a34;color:#fff}
+  .a input{background:#171b22;border:1px solid #232a34;color:var(--ink)}
+  .a .copied{background:#1a1f27;color:var(--c)}
+
+  /* 2 TINT CHIP */
+  .b{background:#0f1218}
+  .b .tb{border-bottom:1px solid #1b1f28}
+  .b .clip{padding:10px 62px 10px 12px;border-radius:9px;
+           background:color-mix(in srgb,var(--c) 15%,transparent);
+           border:1px solid color-mix(in srgb,var(--c) 34%,transparent);
+           color:color-mix(in srgb,var(--c) 45%,#ffffff)}
+  .b .row:hover .clip{background:color-mix(in srgb,var(--c) 26%,transparent)}
+  .b .row.hovered .clip{background:color-mix(in srgb,var(--c) 26%,transparent)}
+  .b .acts{background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--c) 30%,#0f1218) 34%)}
+  .b .abtn:hover{background:rgba(255,255,255,.12);color:#fff}
+  .b input{background:#171b23;border:1px solid #232935;color:var(--ink)}
+  .b .copied{background:color-mix(in srgb,var(--c) 30%,transparent);color:#fff;border-radius:9px}
+
+  /* 3 CARD + SWATCH */
+  .c{background:#0d1015}
+  .c .tb{border-bottom:1px solid #191d25}
+  .c .clip{padding:11px 62px 11px 11px;border-radius:9px;background:#161a21;
+           border:1px solid #1f242d;gap:10px}
+  .c .sw{width:16px;height:16px;border-radius:5px;background:var(--c);flex:none}
+  .c .row:hover .clip{background:#1b2029;border-color:#2a303b}
+  .c .row.hovered .clip{background:#1b2029;border-color:#2a303b}
+  .c .acts{background:linear-gradient(90deg,rgba(27,32,41,0),#1b2029 30%)}
+  .c .abtn:hover{background:#242a34;color:#fff}
+  .c input{background:#161a21;border:1px solid #1f242d;color:var(--ink)}
+  .c .copied{background:#1b2029;color:var(--c);border-radius:9px}
+
+  /* 4 GRID */
+  .d{background:#101318}
+  .d .tb{border-bottom:1px solid #1c212a}
+  .d .tiles{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .d .clip{height:66px;border-radius:10px;padding:9px;align-items:flex-end;
+           background:color-mix(in srgb,var(--c) 17%,transparent);
+           border:1px solid color-mix(in srgb,var(--c) 32%,transparent);
+           font-size:12.5px;font-weight:600;line-height:1.3;
+           color:color-mix(in srgb,var(--c) 40%,#ffffff)}
+  .d .clip{white-space:normal}
+  .d .clip span{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .d .row:hover .clip{background:color-mix(in srgb,var(--c) 28%,transparent)}
+  .d .row.hovered .clip{background:color-mix(in srgb,var(--c) 28%,transparent)}
+  .d .acts{top:4px;right:4px;bottom:auto;padding:0;background:none;gap:1px}
+  .d .abtn:hover{background:rgba(255,255,255,.14);color:#fff}
+  .d input{background:#181c24;border:1px solid #242a34;color:var(--ink)}
+  .d .copied{border-radius:10px;background:color-mix(in srgb,var(--c) 34%,transparent);color:#fff}
+
+  /* 5 TERMINAL */
+  .e{background:#080a0d;font-family:ui-monospace,"Cascadia Code",Consolas,monospace}
+  .e .tb{border-bottom:1px solid #161b22}
+  .e .clip{padding:8px 62px 8px 10px;border-radius:0;border-left:2px solid transparent;
+           font-size:12.5px;color:#c3ccd8;font-family:inherit}
+  .e .clip .pfx{color:var(--c);margin-right:8px}
+  .e .row:hover .clip{background:#0f141a;border-left-color:var(--c)}
+  .e .row.hovered .clip{background:#0f141a;border-left-color:var(--c)}
+  .e .acts{background:linear-gradient(90deg,rgba(15,20,26,0),#0f141a 30%)}
+  .e .row{margin-bottom:1px}
+  .e .abtn:hover{background:#161c24;color:#fff}
+  .e input{background:#0f141a;border:1px solid #1b222b;color:var(--ink);font-family:inherit}
+  .e .copied{background:#0f141a;color:var(--c);font-family:inherit}
+
+  /* 6 SOLID */
+  .f{background:#151922}
+  .f .tb{border-bottom:1px solid #212734}
+  .f .clip{padding:11px 62px 11px 13px;border-radius:9px;background:var(--c);
+           color:#fff;font-weight:600;font-size:13.5px}
+  .f .row:hover .clip{filter:brightness(1.14)}
+  .f .row.hovered .clip{filter:brightness(1.14)}
+  .f .acts{background:linear-gradient(90deg,transparent,rgba(0,0,0,.38) 40%);
+           border-radius:0 9px 9px 0}
+  .f .abtn{color:rgba(255,255,255,.86)}
+  .f .abtn:hover{background:rgba(0,0,0,.3);color:#fff}
+  .f input{background:#1e2431;border:1px solid #2b3340;color:var(--ink)}
+  .f .copied{background:rgba(0,0,0,.42);color:#fff;border-radius:9px}
+</style>
+</head>
+<body>
+<svg style="display:none">
+  <symbol id="plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></symbol>
+  <symbol id="pin" viewBox="0 0 24 24"><path d="M5 4h14M12 7v13M12 7l-4 5h8l-4-5z"/></symbol>
+  <symbol id="tune" viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 12h4M12 12h8M4 17h10M18 17h2"/><circle cx="16" cy="7" r="1.9"/><circle cx="10" cy="12" r="1.9"/><circle cx="16" cy="17" r="1.9"/></symbol>
+  <symbol id="edit" viewBox="0 0 24 24"><path d="M4 20h4L19 9a2.1 2.1 0 0 0-3-3L5 17v3z"/><path d="M14.5 6.5l3 3"/></symbol>
+  <symbol id="trash" viewBox="0 0 24 24"><path d="M4 7h16M9 7V5h6v2M6.5 7l1 13h9l1-13M10.5 11v6M13.5 11v6"/></symbol>
+  <symbol id="lock" viewBox="0 0 24 24"><rect x="4.5" y="10.5" width="15" height="10" rx="2.2"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/></symbol>
+</svg>
+
+<h1>FastClip — design options, second pass</h1>
+<p class="sub">Icons are inline SVG in the Material outlined style: no emoji, no CDN.
+Row actions stay hidden until hover, so the list reads as content rather than controls.
+Real window size, 300&times;600, same eight clips throughout.</p>
+
+<div class="bar">
+  <button data-s="list" aria-pressed="true">Clip list</button>
+  <button data-s="hover" aria-pressed="false">Hover state</button>
+  <button data-s="copied" aria-pressed="false">Just copied</button>
+  <button data-s="search" aria-pressed="false">Search active</button>
+  <button data-s="locked" aria-pressed="false">Locked</button>
+  <span class="note">Hovering a row shows edit and delete.</span>
+</div>
+
+<div class="grid" id="grid"></div>
+
+<script>
+const CLIPS=[["Work email","blue"],["Support: refund reply","teal"],["SSH prod box","red"],
+ ["Home address","green"],["VAT number","amber"],["Standup template","violet"],
+ ["npm publish","slate"],["Zoom standing link","pink"]];
+
+const OPTS=[
+ {k:"a",n:"1 · Rail",d:"Colour is a 3px rail at the row edge. Flat rows, no fills — the densest option and the quietest."},
+ {k:"b",n:"2 · Tint chip",d:"Each clip tinted 15% of its own colour with a matching border and text. Colour is unmistakable without shouting."},
+ {k:"c",n:"3 · Card + swatch",d:"Neutral cards, colour reduced to a 16px swatch. Most conventional; scales best if labels get long."},
+ {k:"d",n:"4 · Grid",d:"Two columns of tinted tiles. Roughly double the clips per screen; labels wrap to two lines."},
+ {k:"e",n:"5 · Terminal",d:"Monospace, near-black, colour as a prompt marker and a left border on hover. Tightest rows of all six."},
+ {k:"f",n:"6 · Solid",d:"Full-colour fills, closest to today but properly executed. Actions sit under a gradient scrim so they stay legible on any fill."}];
+
+const ic=id=>`<svg class="i"><use href="#${id}"/></svg>`;
+const acts=`<span class="acts"><button class="abtn">${ic("edit")}</button><button class="abtn">${ic("trash")}</button></span>`;
+
+function inner(k,l,c){
+  if(k==="c") return `<span class="sw"></span>${l}`;
+  if(k==="d") return `<span>${l}</span>`;
+  if(k==="e") return `<span class="pfx">&gt;</span>${l}`;
+  return l;
+}
+
+function body(k,s){
+  if(s==="locked") return `<div class="lock">
+      <div class="ring">${ic("lock")}</div>
+      <div style="font-weight:600;font-size:14px">FastClip is locked</div>
+      <div class="pin"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+      <div class="lmsg">Enter your 6-digit PIN. No clip is listed until you do.</div></div>`;
+
+  const srch = s==="search"
+    ? `<div class="srch">${ic("search")}<input value="ref"></div>` : "";
+  const list = s==="search" ? CLIPS.filter(c=>/ref/i.test(c[0])) : CLIPS;
+  const open = k==="d" ? `<div class="scroll"><div class="tiles">` : `<div class="scroll">`;
+  const close = k==="d" ? `</div></div>` : `</div>`;
+
+  return srch+open+list.map(([l,c],i)=>{
+    const hov = (s==="hover"||s==="copied") && i===2 ? " hovered" : "";
+    const cop = s==="copied" && i===2 ? `<span class="copied" style="display:flex">COPIED</span>` : "";
+    return `<div class="row${hov}" style="--c:var(--c-${c})">
+      <button class="clip">${inner(k,l,c)}</button>${acts}${cop}</div>`;
+  }).join("")+close;
+}
+
+function render(s){
+  document.getElementById("grid").innerHTML=OPTS.map(o=>`
+    <div class="opt"><h2>${o.n}</h2><p>${o.d}</p>
+      <div class="win ${o.k}">
+        <div class="tb">
+          <button class="tbtn" title="New clip">${ic("plus")}</button>
+          <button class="tbtn" title="Search">${ic("search")}</button>
+          <span class="grow"></span>
+          <button class="tbtn" title="Always on top">${ic("pin")}</button>
+          <button class="tbtn" title="Settings">${ic("tune")}</button>
+        </div>${body(o.k,s)}
+      </div></div>`).join("");
+}
+document.querySelectorAll(".bar button").forEach(b=>b.onclick=()=>{
+  document.querySelectorAll(".bar button").forEach(x=>x.setAttribute("aria-pressed",x===b));
+  render(b.dataset.s);
+});
+render("list");
+</script>
+</body>
+</html>
