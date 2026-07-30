@@ -4,7 +4,10 @@
 [ADR-0005](./adr/0005-sqlite-store.md). Schema, key material, durability and
 lock-state ownership ratified by the architect at G0b, and amended in the second
 round for [manual lock](#locking-on-demand), and again for the flat backoff of
-[ADR-0011](./adr/0011-flat-backoff.md). **One item remains open: which Rust
+[ADR-0011](./adr/0011-flat-backoff.md). Amended after
+[WP-07](../work/wp-07-encryption.md) to describe
+[the three store mutexes and the order they are taken in](#the-three-mutexes-and-the-order-they-are-taken-in),
+which this page had recorded as one. **One item remains open: which Rust
 crate**, which waits on the [WP-02](../work/wp-02-toolchain.md) spike.
 
 Read [ADR-0004](./adr/0004-optional-pin-encryption.md),
@@ -51,8 +54,9 @@ the way to move clips. The owner chose the home directory for discoverability.
 `settings.json` is plaintext and outside the database because
 [spec §4.4](../product/spec.md#44-always-on-top) requires the always-on-top
 toggle to apply at launch, which is before any PIN has been entered. It holds no
-clip data. It is written atomically: a temporary file in the same directory,
-then a rename.
+clip data. It is written atomically, in the same four steps as every other
+replaced file here: write a temporary file in the same directory, flush, close,
+rename ([below](#every-write-to-keyfile-is-atomic-every-one)).
 
 Rejected: a `settings` table inside the database. It would be unreadable while
 locked, which is the one moment the window has to be positioned correctly.
@@ -164,9 +168,10 @@ lose the last few. Read that ADR before changing either pragma.
 
 ## Connections
 
-**At most one connection to the live store, behind a mutex.** Every command
-takes the mutex, so `list_clips` during an `import_clips` transaction waits
-rather than failing.
+**At most one connection to the live store, behind the connection mutex.** Every
+command takes that mutex, so `list_clips` during an `import_clips` transaction
+waits rather than failing. The connection mutex is
+[one of three](#the-three-mutexes-and-the-order-they-are-taken-in).
 
 It is opened at these points and no others:
 
@@ -201,7 +206,7 @@ returning** ([below](#switching-encryption-on-and-off)). A conversion reporting
 `crypto { corrupt }` is reporting a failure of the work it was asked to do, not
 discovering the state of an existing store.
 
-`PRAGMA busy_timeout = 5000` on that connection, for the case a mutex cannot
+`PRAGMA busy_timeout = 5000` on that connection, for the case no mutex can
 cover: a second FastClip process. SQLite locks between processes, and without a
 timeout the second one returns `SQLITE_BUSY` immediately and the user sees
 `storage` for what is a wait of milliseconds.
@@ -211,6 +216,49 @@ window issuing one command at a time the pool would add a key-pragma-ordering
 obligation on every checkout ([encryption](#encryption)) for no measurable gain,
 and getting that ordering wrong is the documented route to
 `file is not a database`.
+
+### The three mutexes, and the order they are taken in
+
+`Store` in `src-tauri/src/storage/store.rs` holds **three** mutexes. Each guards
+a different fact, and they are listed in the order they must be acquired:
+
+| Field | Guards | Held for |
+| ----- | ------ | -------- |
+| `conversion` | The right to run a whole-store conversion, **including its key-material step**. This mutex guards no data; holding the guard is the permission ([below](#switching-encryption-on-and-off)). | The whole of `enable_encryption` or `disable_encryption`, from before the first state check until the command returns. |
+| `connection` | The one connection to the live store, and whether there is one at all. | One command's database work; a whole conversion's steps 2 to 7; the checkpoint and close performed by [`lock`](#locking-on-demand) and at shutdown. |
+| `status` | The [classification](#the-classification-is-written-twice), the in-memory unlocked flag, the live DEK, and the fault [startup recovery](#startup-recovery) recorded. | A single read or a single write. Never across the acquisition of another mutex. |
+
+**The rule: acquire `conversion`, then `connection`, then `status`.** A holder
+may skip a level — most commands take only `connection` and `status`, and most
+reads take only `status` — but it may never acquire one it has already passed.
+No holder of a later mutex reaches back for an earlier one, so there is no
+cycle.
+
+Two consequences follow from the rule, and both are load-bearing:
+
+- **`status` is never held across an acquisition of `connection`.** Every method
+  on `Store` that reads `status` releases that guard before the next step, which
+  is why `Store::with_unlocked_store` can check lock state, take `connection`,
+  and check lock state a second time.
+- **A closure passed to `Store::with_unlocked_store` runs with `connection`
+  held, so it must not call `Store::begin_conversion`.** That is the one route by
+  which code outside `src-tauri/src/storage/` can invert the order, because
+  `begin_conversion` returns the only one of the three guards that crosses the
+  module boundary. No caller does this today.
+
+**This section is the rule's single home.** The doc comments in
+`src-tauri/src/storage/store.rs` carry a pointer to this section and **must not
+restate the order**. The rule binds `src-tauri/src/storage/`,
+`src-tauri/src/commands/encryption.rs` and `src-tauri/src/commands/lock.rs`, and
+a fact that has to hold across three modules cannot have a spelling in each —
+two spellings agree until one is edited.
+
+Rejected: leaving the rule in the doc comment on `Status` and pointing at it from
+this page. That siting puts the rule next to one of the three places bound by it
+and out of sight of the other two: `commands/encryption.rs` acquires
+`conversion`, and a developer working there would not find a rule written on a
+private struct in another module. `storage.md` is the page every developer is
+told to read before touching any of the three.
 
 ## Startup recovery
 
@@ -237,9 +285,10 @@ Before the backend serves any command, in this order:
    `absent` case matters because step 6 is about to create a plaintext database,
    and a `keyfile` left from before would then sit beside one. **A delete that
    fails is absorbed** ([below](#when-a-delete-fails)), like step 2's.
-6. If the classification is `absent`, create `clips.db` with
-   `PRAGMA user_version = 1` and the schema above. A first run therefore reaches
-   an empty clip list, not a failure screen.
+6. If the classification is `absent`, create `clips.db` with the schema above
+   and `PRAGMA user_version = 1` **in one transaction**
+   ([below](#version-0-and-why-creation-is-transactional)). A first run therefore
+   reaches an empty clip list, not a failure screen.
 7. If the classification is `plaintext`, or was `absent` and step 6 created one,
    **open the database and read `PRAGMA user_version`.** Hold the connection
    ([connections](#connections)). **Pass condition:** the database opens and
@@ -247,11 +296,38 @@ Before the backend serves any command, in this order:
    → record the fault and serve it from `get_lock_state`
    ([contract](./contract.md#opening-the-database)); it will not open → the same,
    as `crypto { corrupt }`. Do not fail startup in either case, or there is no
-   window in which to show the message. **Lower** is migrated and then held, not
-   rejected — there is nothing to migrate at version 1, and this is the sentence
-   that says so rather than leaving the case unwritten.
+   window in which to show the message. **Lower, but at least 1**, is migrated and
+   then held, not rejected — there is nothing to migrate at version 1, and this is
+   the sentence that says so rather than leaving the case unwritten. **Zero is not
+   a lower version** ([below](#version-0-and-why-creation-is-transactional)).
    If the classification is `encrypted`, do **not** open it: there is no DEK until
    a PIN unwraps one, so the same two faults belong to `unlock`.
+
+### Version 0, and why creation is transactional
+
+`PRAGMA user_version` defaults to **0** in any SQLite database that never set it,
+so 0 is not "an older FastClip store". No FastClip schema was ever numbered 0,
+and there is nothing to migrate from. A `clips.db` reporting 0 is a SQLite file
+that is not a FastClip store.
+
+It is recorded as `crypto { reason: "corrupt" }`, and that variant's description
+in [contract §4](./contract.md#4-errors) covers it: the store cannot be used and
+[import](../product/spec.md#46-export-and-import-json) is the recovery. Reusing
+it rather than adding a variant is deliberate — the user's situation and remedy
+are identical to an unopenable database, and a distinct reason would need a
+distinct copy-deck sentence saying the same thing.
+
+**Step 6 is transactional because otherwise FastClip creates this case itself.**
+Creating the schema and setting the version are two writes; a process killed
+between them leaves a valid, empty, version-0 database that the next launch would
+have had to interpret. `PRAGMA user_version` is a header write and participates
+in a transaction, so one transaction makes the store either absent or complete at
+version 1, and never the thing this section had to define.
+
+The same floor applies to the key material: a leading byte of 0 in `keyfile` is
+not version zero of a format, it is a file no FastClip wrote, and it is
+`crypto { reason: "bad_key_material" }` — which already reads "missing,
+unreadable, or from another Windows account or machine".
 
 **Why the sweep is first and ungated.** The `unreadable` stop exists to prevent
 deleting `keyfile` and creating a fresh database when the store's state is
@@ -426,6 +502,91 @@ XChaCha20-Poly1305 rather than AES-256-GCM: a 192-bit nonce removes the
 nonce-collision analysis entirely, and the wrap happens rarely enough that AES
 hardware acceleration is worth nothing here.
 
+#### Every write to `keyfile` is atomic. Every one.
+
+`keyfile` holds the **only** copy of the wrapped DEK. There is no second copy and
+no reset path ([ADR-0004](./adr/0004-optional-pin-encryption.md)), so a rewrite
+interrupted in place destroys every clip in an encrypted store.
+
+**The rule is on the file, not on the command:** every write to `keyfile` goes to
+`keyfile.new`, which is flushed, **closed**, and renamed over `keyfile`. No caller
+writes it in place, and no caller is exempt.
+
+The close is part of the rule rather than a detail of it. Windows refuses to
+rename a file that is still open, so an implementation that flushes and renames
+without closing does not write the key material at all — and the failure surfaces
+as a rename error on the path where the store's only key was supposed to change.
+The same four-step shape — write, flush, close, rename — is what
+`settings.json` and the export file's `<path>.part` use
+([contract §2](./contract.md#export_clips)).
+
+It is stated here rather than per-command because there are four writers and only
+two of them had the requirement:
+
+| Writer | Writes | Previously required to be atomic? |
+| ------ | ------ | --------------------------------- |
+| `enable_encryption` step 1 | the whole blob, first time | yes |
+| `change_pin` | the re-wrapped DEK | yes, in [contract §2](./contract.md#change_pin) |
+| **A failed `unlock`** | `failed_attempts`, `locked_until_unix_ms` | **no — it was described only as "persisted"** |
+| **A successful `unlock`** | `failed_attempts` reset to 0 | **no** |
+
+The two that were missing it are the dangerous ones, because they are the
+frequent ones. Recording a wrong PIN means re-serialising the blob,
+re-DPAPI-protecting it and rewriting the file — so a non-atomic implementation
+lets **a user destroy their store by mistyping their PIN**, on the most-exercised
+failure path in the feature. That is the exact promise
+[ADR-0004](./adr/0004-optional-pin-encryption.md) makes when it says nothing is
+ever wiped after failed attempts, and a per-command rule left it to each caller
+to remember.
+
+A crash between the write and the rename leaves `keyfile.new`, which startup
+recovery step 2 sweeps and which no reader ever consults.
+
+**A failed counter write does not fail the command**, and the in-memory counter
+follows the file rather than the other way round:
+
+- A failed `unlock` whose counter write fails still returns `bad_pin`, carrying
+  the `attempts_remaining` that is **actually on disk**. Reporting an increment
+  that was not persisted would put the frontend and the file into disagreement
+  about the one value the backoff is derived from.
+- A successful `unlock` whose reset fails still succeeds. The user typed the
+  right PIN; refusing the unlock because a counter could not be cleared would
+  deny them their store to protect a number. The stale counter costs them a
+  backoff they have not earned on some later launch, which is recoverable, and it
+  is logged ([ADR-0012](./adr/0012-logging.md)).
+
+A file made permanently unwritable would therefore allow unlimited attempts. That
+requires the Windows account, which [ADR-0002](./adr/0002-threat-model.md)
+already concedes to an attacker, and it is a weaker capability than reading the
+DPAPI blob outright.
+
+#### DPAPI entropy, and the blob's encoding
+
+Both choices below are **permanent**. Changing either makes every existing store
+unopenable, and there is no migration path for key material — the store cannot be
+read to rewrite it without the key the change just invalidated.
+
+**`CryptProtectData` is called with no optional entropy — `None`.**
+
+| Alternative | Rejected because |
+| ----------- | ---------------- |
+| The PIN as entropy | It collapses the two factors into one check. The PIN would then be required to unprotect the blob, so a wrong PIN and a blob from another Windows account would fail identically — and [contract §4](./contract.md#4-errors) treats `crypto { bad_key_material }` and `bad_pin` as different facts with different remedies and different messages. It also destroys the authenticated wrong-PIN detection that makes `attempts_remaining` exact. |
+| A constant baked into the binary | It buys nothing. An attacker running as the user — the threat [ADR-0002](./adr/0002-threat-model.md) concedes — has the binary and therefore the constant. It costs the ability to ever change it. |
+
+**The blob's interior is `serde_json`.** The field table above lists what it
+holds; this is how those fields are encoded.
+
+| Alternative | Rejected because |
+| ----------- | ---------------- |
+| `bincode` | Positional. A field reordered or inserted silently misreads an existing store rather than failing, and the failure surfaces as a wrong DEK. |
+| Anything needing a new dependency | `serde_json` is already a dependency, and the blob is around 350 bytes — compactness is worth nothing here. |
+
+Self-describing encoding is the point rather than a side effect: the KDF
+parameters live in this blob precisely so the cost can be raised later, and an
+encoding where adding a field breaks old readers would defeat that. The leading
+version byte outside the blob remains the mechanism for a change that is *not*
+backward-compatible.
+
 ### Argon2id parameters and the backoff
 
 Binding floor: `m_cost ≥ 19 MiB`, `t_cost ≥ 2`, `p_cost = 1` — the OWASP
@@ -440,6 +601,34 @@ The DEK is 256 bits and is handed to SQLCipher as a **raw key**, which bypasses
 SQLCipher's own KDF. The key pragma is the first statement on every connection;
 chaining `journal_mode` or `foreign_keys` before it is a documented way to get
 `file is not a database`.
+
+#### A keying statement's error is never formatted
+
+**No error from a statement carrying the DEK may be rendered, logged, displayed,
+or converted to a string.** Keying statements have their own error path, which
+logs a fixed message and discards the error value.
+
+This is a disclosure rule and it became live the moment a log sink existed
+([ADR-0012](./adr/0012-logging.md)). `PRAGMA key = '…'` and the `KEY` clause of
+`ATTACH` **cannot take a bound parameter**, so the DEK is embedded in the SQL
+text — and a SQLite error type that reports the offending SQL in its `Display`
+therefore renders **the DEK in hex**. `log::error!("…: {error}")`, the idiom used
+correctly everywhere else in this codebase, writes the key into
+`~/.fast-clip/fastclip.log` in plaintext, next to the database it decrypts.
+
+That breaches [criterion 6](../product/spec.md#8-acceptance-criteria) more
+completely than logging a clip value would: one line surrenders the whole store,
+and it survives in a file that is not encrypted and is readable while the store is
+locked.
+
+It is written down because **nothing about the calling code looks wrong.** The
+statement is correct, the error handling is idiomatic, and the disclosure comes
+from a `Display` implementation in a dependency. A reviewer reading the keying
+code sees nothing; only someone who has read the error type's source knows. The
+test that catches it greps the log for the DEK, the PIN, the salt and the wrapped
+blob after an encrypted session
+([ADR-0012](./adr/0012-logging.md)), and that test is the standing guard rather
+than the review.
 
 **The backoff is a flat 30 seconds**
 ([ADR-0011](./adr/0011-flat-backoff.md)):
@@ -495,8 +684,9 @@ is **written at exactly two points**:
 no fault involved.** Encryption off, so the classification is `plaintext`. The
 user enables encryption; it succeeds and emits `locked: false`, and the frontend
 shows the Lock control. The user presses Lock. [`lock`](#locking-on-demand) reads
-lock state after taking the mutex, from this value — which would still say
-`plaintext` — and returns `wrong_state { required: "encrypted" }`, an error
+lock state after taking the connection mutex, from this value — which would
+still say `plaintext` — and returns `wrong_state { required: "encrypted" }`, an
+error
 [the contract](./contract.md#lock) describes as unreachable in normal use. The
 user could neither lock nor disable the encryption they had just enabled until
 they restarted.
@@ -521,14 +711,14 @@ is a specification change before it is a code change.
 1. **Acquire the store's connection mutex** — the same one every command takes
    ([connections](#connections)). This waits for any command already executing to
    finish, so no transaction is interrupted and no committed write is lost.
-2. Read lock state, **after** taking the mutex and not before. Encryption off →
-   release and return `wrong_state { required: "encrypted" }`. Already locked →
-   release and go to step 5. Reading it first would let a
+2. Read lock state, **after** taking the connection mutex and not before.
+   Encryption off → release and return `wrong_state { required: "encrypted" }`.
+   Already locked → release and go to step 5. Reading it first would let a
    `disable_encryption` that was already running complete in between, and `lock`
    would then lock a store that had just become plaintext.
 3. `PRAGMA wal_checkpoint(TRUNCATE)`, then close the SQLCipher connection.
 4. Zeroise the in-memory DEK and clear the in-memory unlocked flag. Release the
-   mutex.
+   connection mutex.
 5. Rebuild the tray menu to the single *Unlock FastClip* item
    ([spec §4.8](../product/spec.md#48-encryption-and-unlocking)), emit
    `lock_state`, return.
@@ -561,12 +751,16 @@ database. That is the launch path exactly, so it is not new code.
 Rejected: keeping the connection open behind a boolean. It is cheaper, it keeps
 `unlock` instant, and it means less.
 
-**Every clip-touching command re-checks lock state after acquiring the mutex.** A
-command checks on entry, before it queues for the connection; one that passed
-that check and then waited behind `lock` would otherwise wake to a closed
-connection and report `storage` or `internal` for what is an ordinary lock. The
+**Every clip-touching command re-checks lock state after acquiring the connection
+mutex.** A
+command checks once before it touches the store — after validating its arguments
+and before it queues for the connection
+([contract §2](./contract.md#2-commands)) — and one that passed that check and
+then waited behind `lock` would otherwise wake to a closed connection and report
+`storage` or `internal` for what is an ordinary lock. The
 second check means a concurrent `lock` produces exactly two outcomes — the
-command completed before `lock` took the mutex, or it returns `locked`. It never
+command completed before `lock` took the connection mutex, or it returns
+`locked`. It never
 produces a third *from the lock*. A command can still fail on its own merits at
 the same moment, for a reason that has nothing to do with locking
 ([contract](./contract.md#lock)).
@@ -597,6 +791,19 @@ from a database that never set one — and
 apply, so every converted store looks like it needs migrating from version zero
 forever.
 
+**Both conversions run under the `conversion` mutex**, taken before their first
+state check and therefore before `enable_encryption` writes `keyfile` at step 1
+([above](#the-three-mutexes-and-the-order-they-are-taken-in)). The connection
+mutex does not cover step 1's write, because step 1 completes before step 2
+acquires the connection mutex, so the connection mutex alone does not serialise
+the two commands. The `conversion` guard has to be taken before the first write
+and therefore before the state checks, so that a second conversion refuses and
+returns **without reaching an abort path at all** — that abort deletes
+`keyfile`. The sequence by which two overlapping conversions leave an encrypted
+store with no key, and the reason the guard exists even though sync Tauri
+commands cannot overlap today, are set out in `Store::begin_conversion` in
+`src-tauri/src/storage/store.rs` and are not repeated here.
+
 Enabling:
 
 1. Generate a random 256-bit DEK. Wrap it, DPAPI-protect it, write `keyfile.new`,
@@ -609,17 +816,19 @@ Enabling:
    open it.
 2. Record `n = SELECT count(*) FROM clips` and `v = PRAGMA user_version` from the
    **source**. Then `sqlcipher_export()` into `clips.db.new`, keyed with the DEK,
-   and `PRAGMA clips_new.user_version = v`.
+   and `PRAGMA clips_new.user_version = v`. Any of the three failing → abort.
 3. **Open `clips.db.new` with the DEK and verify it.** Key pragma first, then
    three assertions ([below](#what-step-3-asserts)). Any assertion failing, or
    the open failing → abort.
 4. `PRAGMA wal_checkpoint(TRUNCATE)` on both databases, then close both
-   connections.
+   connections. Failure → abort.
 5. **Delete `clips.db-wal` and `clips.db-shm`.** They are the *plaintext*
    sidecars. Failure → abort.
 6. Rename `clips.db.new` over `clips.db`. **Commit point.** Set the
    classification to `encrypted` here, not at the end of the command
-   ([below](#the-classification-is-written-twice)).
+   ([below](#the-classification-is-written-twice)). **A failed rename is an
+   abort** — nothing committed, no classification written
+   ([below](#abort)).
 7. Reopen `clips.db` with the DEK and hold the connection
    ([connections](#connections)).
 8. **Emit `lock_state`, whether or not step 7 succeeded**
@@ -633,12 +842,12 @@ rather than before it:
 
 1. —
 2. Record `n` and `v` from the source, `sqlcipher_export()` into a plaintext
-   `clips.db.new`, and write `user_version = v` onto it.
+   `clips.db.new`, and write `user_version = v` onto it. Failure → abort.
 3. Open `clips.db.new` and verify it, as above. Failure → abort.
-4. Checkpoint both, close both.
+4. Checkpoint both, close both. Failure → abort.
 5. Delete the **encrypted** `clips.db-wal` and `clips.db-shm`. Failure → abort.
 6. Rename `clips.db.new` over `clips.db`. **Commit point.** Set the
-   classification to `plaintext` here.
+   classification to `plaintext` here. **A failed rename is an abort.**
 7. Reopen the now-plaintext `clips.db` and hold the connection.
 8. **Emit `lock_state`, whether or not step 7 succeeded.**
 9. Delete `keyfile`. Absorbed on failure. Return `null`, or `storage` if step 7
@@ -660,14 +869,60 @@ abort path never taken.
 
 All three must pass. Any one failing is an abort, with the store untouched.
 
-**Abort means abort to the state before the command was called**, and it is
-reachable at steps 1 to 5, all of which precede the commit point. Delete
-`clips.db.new` and its sidecars, delete `keyfile.new`, delete `keyfile` on the
-enable path — where it was written before the commit point — **reopen the
-original `clips.db` and hold the connection**, and return the error. The store is
-byte-for-byte what it was and the application is still usable. A recovered
-failure that left the user unable to copy a clip until they restarted would be a
-worse outcome than the failure.
+#### Abort
+
+**Abort means abort to the state before the command was called.** It is reachable
+at **steps 1 to 6** — every step up to and including the rename, all of which
+either precede the commit point or are the commit failing to happen.
+
+Abort is three actions, **in this order**:
+
+1. **Release every handle this command holds on `clips.db.new`.** `DETACH` it if
+   `sqlcipher_export()` attached it to the original connection; close it if step 3
+   opened it as a connection of its own. Both, if both.
+2. **Delete `clips.db.new` and its sidecars**, delete `keyfile.new`, and on the
+   enable path delete `keyfile` — it was written before the commit point.
+3. **Ensure the original `clips.db` is open** and its connection held. Reopen it
+   only if this command closed it.
+
+Then return the error. The store is byte-for-byte what it was and the application
+is still usable: a recovered failure that left the user unable to copy a clip
+until they restarted would be a worse outcome than the failure.
+
+**Step 1 must precede step 2, and this is not a style preference.** On Windows an
+open SQLite database cannot be deleted; the delete fails while a handle is held.
+Deleting before releasing therefore leaves `clips.db.new` on disk — and on the
+disable path that file is **a complete plaintext copy of every label and value**,
+sitting beside a store the user has just been told is still encrypted, for the
+rest of the session. It survives until the next launch's sweep, which is exactly
+the exposure [step 2 of startup recovery](#startup-recovery) exists to bound
+rather than to be the only defence against.
+
+**Step 3 says "ensure", not "reopen", because the original is not always closed.**
+It is closed at step 4. An abort at steps 1, 2 or 3 — including the verification
+failure that step 3 exists to catch — happens while the original connection is
+still open and working, and an unconditional reopen would either open it twice or
+drop a good connection to replace it for nothing. The design allows
+[at most one connection to the live store](#connections), so "reopen" was wrong
+for half the abort points.
+
+| Abort at | `clips.db.new` is held by | The original is |
+| -------- | ------------------------- | --------------- |
+| Step 1 | nothing — it does not exist yet | open; leave it |
+| Step 2 | the original connection, via `ATTACH` | open; `DETACH`, then leave it |
+| Step 3 | its own connection | open; close the step-3 connection, then leave it |
+| Step 4 | nothing, or whichever close succeeded | closing or closed; reopen |
+| Step 5 | nothing | closed; reopen |
+| Step 6 | nothing | closed; reopen |
+
+**A failed rename at step 6 is an abort, not a partial commit.** The rename is
+the commit point and it either happened or it did not, so a failure means nothing
+committed: the classification is **not** written
+([above](#the-classification-is-written-twice)), no `lock_state` is emitted, and
+the store is byte-for-byte as it was. That is the only reading under which step 8
+cannot announce encryption over a plaintext store. The sidecars deleted at step 5
+are not restored and do not need to be — they were checkpointed into the database
+file first, so reopening at step 3 of the abort recreates them empty.
 
 #### The reopen, and why it is verified first
 

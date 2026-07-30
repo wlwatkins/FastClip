@@ -112,6 +112,15 @@ No work.
 - The frontend calls no Tauri window API for always-on-top, and the capability
   set does not grant it.
 - An interrupted write leaves either the old settings or the new ones.
+- **`get_lock_state` is registered** and, with encryption off, returns either the
+  unlocked state or the fault startup recovery recorded.
+- **The startup sequence runs as the contract defines it** — `get_settings`,
+  `get_lock_state`, branch, `list_clips` — and `App.svelte` no longer calls
+  `list_clips` directly.
+- **A store that will not open reaches the failure screen, not an empty list.**
+  An empty list is indistinguishable from a fresh install, which is how a user
+  is told their clips are gone when they are merely unreachable. This is the
+  criterion the package exists to make testable.
 - **The always-on-top toggle is reachable by `Tab`, operable by `Enter` and
   `Space`, carries an accessible name, and shows a focus indicator distinct from
   hover.**

@@ -42,7 +42,42 @@ conflicts between two implementations of the same feature under pressure.
 
 This is an owner decision, not an architect one.
 
+## One fact, one home
+
+**An invariant binding more than one module is written in the book, and the code
+points at it.** Not restated in a doc comment, not repeated in a second module,
+not spelled twice in agreement.
+
+This is the most common defect in the project — eight instances, catalogued in
+[recurring defect classes](../reference/defect-classes.md). Every one of them was
+correct on the day it was written and invisible to `cargo test`, `clippy`, `tsc`
+and `vitest`, because both copies agreed.
+
+When a fact needs to appear in a second place, take the first of these that
+applies:
+
+| Remedy | Example |
+| ------ | ------- |
+| Derive the second from the first | `command_handler!` — one handler list, expanded in both `lib.rs` and `tests/ipc.rs` |
+| Make a test fail on divergence | `CASES.len() == 16` in `tests/ipc.rs`, which forces a row for any new command |
+| Delete the second and leave a pointer | The mutex acquisition order, which lives in [storage](../architecture/storage.md) and is named — not restated — from `store.rs` |
+| Record the duplication as accepted, with the reason | The fallback. It preserves the fault, but an inherited surprise is cheaper than an unrecorded one |
+
+The rule binds the **rule**, not the reasoning that justifies it. The race
+analysis for `Store::begin_conversion` stays beside that function; the book links
+to it rather than copying it.
+
 ## Commits
+
+**No agent commits on this project.** The owner writes every commit. The block is
+enforced in four layers — `.claude/settings.json` deny rules for both `Bash(git …)`
+and `PowerShell(git …)`, a `PreToolUse` hook, and `.githooks/pre-commit` and
+`pre-push` keyed on the Claude environment variables with `core.hooksPath` set.
+Three of those four were inert on 2026-07-29 and the policy was breached three
+times before it was found; do not assume a layer works because it exists.
+
+The owner's own commits are unaffected: the hooks detect the agent shell and
+allow everything else.
 
 Conventional commits, scoped to the owning agent's area:
 
@@ -101,10 +136,17 @@ grepping the generated `id="..."` attributes in `docs/book/`.
 
 ## Versioning
 
-One source of truth, enforced in CI. `src-tauri/Cargo.toml` holds the version;
-`package.json` must match it, and `tauri.conf.json` carries no `version` key so
-Tauri inherits. `scripts/check-version.mjs` fails the build on any divergence,
-including a re-added `tauri.conf.json` version.
+One source of truth. `src-tauri/Cargo.toml` holds the version; `package.json`
+must match it, and `tauri.conf.json` carries no `version` key so Tauri inherits.
+`scripts/check-version.mjs` fails on any divergence, including a re-added
+`tauri.conf.json` version.
+
+**The gate is no longer enforced automatically.** The project has no GitHub
+Actions credits, so `.github/workflows/ci.yml` is `workflow_dispatch:` only and
+nothing runs `check-version.mjs` unless a person does. Run it locally before a
+release, along with the four commands in `CLAUDE.md`. This is the third instance
+of "the check exists but nothing invokes it" in this project — the other two were
+the git hooks and the `import.field` truncation rule.
 
 The gate accepts any valid semver, prereleases included. `0.1.0-1` is valid
 semver and would pass it. If a prerelease is in fact unacceptable — the Tauri

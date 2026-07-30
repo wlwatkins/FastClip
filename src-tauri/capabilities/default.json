@@ -1,19 +1,34 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Capability for the main window",
+  "description": "Capability for the main window. core:window:deny-set-always-on-top is load-bearing: always-on-top is applied by the backend, at window creation and on set_always_on_top, and two writers of one window property is two sources of truth (contract, set_always_on_top). core:window:default grants only the is-always-on-top read, so the deny is what keeps the write ungranted after an edit rather than by luck. The dialog grant is the two operations contract closed question 15 gives the frontend and no others: dialog:default would also grant the message dialog, which nothing calls, so the two denies keep it ungranted if someone later reaches for the default set. The twelve core:tray denies are the same rule applied to WP-08: core:default includes core:tray:default, which grants every tray command, and enabling the tauri tray-icon feature is what makes those commands exist for the first time. The tray is backend-owned because it must show a single Unlock item and no clip labels while locked (spec 4.8, acceptance criterion 10), and a frontend able to call core:tray:set_menu or core:tray:new could put clip text into a native menu with the backend unaware. Nothing in src/ calls the tray API, so the denies cost nothing and keep that surface ungranted after an edit rather than by luck. The clipboard-manager plugin is granted nothing here, on purpose: the one clipboard write goes through clips::copy on the Rust side (AppClipboard::write_text, commands/clipboard.rs), which calls the plugin's Rust API and is not gated by this ACL at all, so no webview grant is needed for the app to work. Granting clipboard-manager:allow-write-text would instead open a second, backend-unaware path — invoke('plugin:clipboard-manager|write_text', ...) from the webview — that writes the system clipboard without going through clips::copy, so use_count is never incremented and the tray ranking is built from a subset of the user's copies. That is the same failure WP-08 rules out for the tray, argued the same way: nothing in src/ calls the clipboard plugin, so the absent grant costs nothing and keeps that surface ungranted after an edit rather than by luck.",
   "windows": [
     "main"
   ],
   "permissions": [
     "core:default",
     "opener:default",
-    "clipboard-manager:default",
-    "clipboard-manager:allow-write-text",
     "core:window:allow-start-dragging",
     "core:window:allow-close",
     "core:window:allow-minimize",
     "core:window:allow-toggle-maximize",
-    "core:window:allow-internal-toggle-maximize"
+    "core:window:allow-internal-toggle-maximize",
+    "core:window:deny-set-always-on-top",
+    "dialog:allow-save",
+    "dialog:allow-open",
+    "dialog:deny-message",
+    "dialog:deny-confirm",
+    "core:tray:deny-new",
+    "core:tray:deny-get-by-id",
+    "core:tray:deny-remove-by-id",
+    "core:tray:deny-set-icon",
+    "core:tray:deny-set-menu",
+    "core:tray:deny-set-tooltip",
+    "core:tray:deny-set-title",
+    "core:tray:deny-set-visible",
+    "core:tray:deny-set-temp-dir-path",
+    "core:tray:deny-set-icon-as-template",
+    "core:tray:deny-set-icon-with-as-template",
+    "core:tray:deny-set-show-menu-on-left-click"
   ]
 }

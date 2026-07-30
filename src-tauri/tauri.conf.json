@@ -11,6 +11,8 @@
   "app": {
     "windows": [
       {
+        "label": "main",
+        "create": false,
         "title": "FastClip",
         "width": 300,
         "minWidth": 250,

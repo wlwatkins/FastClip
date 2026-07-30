@@ -18,18 +18,96 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2.6.3", features = [] }
 
 [dependencies]
-tauri = { version = "2.11.5", features = [] }
+# `tray-icon` is a feature of a dependency that is already here, not a new
+# dependency. Without it `tauri::tray` does not exist and WP-08 cannot be built;
+# it turns on the optional `tray-icon` crate, which `Cargo.lock` already
+# resolved. Enabling it also makes the `core:tray:*` IPC commands live for the
+# first time, which is why `capabilities/default.json` now denies all twelve of
+# them — see the note in that file.
+tauri = { version = "2.11.5", features = ["tray-icon"] }
 tauri-plugin-opener = "2.5.4"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.151"
 tauri-plugin-clipboard-manager = "2.3.2"
+# The Rust half of the file dialogs. Contract §2 (`export_clips`, closed
+# question 15) assigns the dialog to the frontend, which calls
+# `@tauri-apps/plugin-dialog`'s `save()` and `open()` — and those reject at
+# runtime unless this crate is registered on the builder and the capability
+# grants the two operations. `2.7.2` is the version whose npm counterpart
+# `package.json` already carries, so the two halves of one plugin cannot
+# disagree. Pinned exactly: a dialog permission set that changes shape would
+# widen a capability nobody re-read.
+tauri-plugin-dialog = "=2.7.2"
 uuid = { version = "1.24.0", features = ["serde", "v4"] }
 dirs = "6.0.0"
 log = "0.4.25"
+# ADR-0012. Pinned exactly, as `tauri-plugin-dialog` above is: the content rule
+# the ADR turns on an obligation — "a log::call formatting a clip label or
+# value is BLOCK" — is a property of what this crate does with the lines it is
+# given, and a minor bump changing a default (format, rotation) is a change
+# nobody re-read against that rule. `2.8.0` resolved at installation, WP-02
+# addendum, against tauri `2.11.5`.
+tauri-plugin-log = "=2.8.0"
 # Pinned to 0.32 by ADR-0005. Do not bump without re-running the WP-02 spike:
 # rusqlite 0.40.1 resolves libsqlite3-sys 0.38.1, whose build script does not
 # compile on stable rustc.
 rusqlite = { version = "0.32", features = ["bundled-sqlcipher-vendored-openssl"] }
+
+# ---- WP-07 key material (ADR-0004) ----
+#
+# All four are pinned exactly. Key material written by one version of this
+# construction must be readable by the next, and a silent minor bump that
+# changed a default parameter, an encoding or a nonce length would make every
+# existing store unopenable — which is data loss, not a build failure. Bumping
+# any of these means re-running `tests/keyfile_round_trip.rs` and re-measuring
+# the Argon2id tuple.
+#
+# Argon2id, named by ADR-0004.
+#
+# **`alloc` is off, and that is the whole point of this entry.** Nothing here
+# stores a PHC string — the parameters live in `keyfile` as their own fields
+# (storage.md § What the key material file holds) — and argon2's own
+# `alloc = ["password-hash/alloc"]` is what drags `password-hash` and
+# `base64ct` in. Leaving it off means the PHC *parser* is not linked at all,
+# which is a string parser this application would otherwise carry and never
+# call. The cost is that `crypto::kdf` allocates the memory blocks itself and
+# calls `hash_password_into_with_memory`, which is ungated and length-checked.
+#
+# `zeroize` wipes the crate's internal buffers.
+argon2 = { version = "=0.5.3", default-features = false, features = [
+    "zeroize",
+] }
+# XChaCha20-Poly1305, named by storage.md: a 192-bit nonce removes the
+# nonce-collision analysis entirely, and the wrap happens rarely enough that AES
+# hardware acceleration is worth nothing here.
+# `XChaCha20Poly1305` is unconditional in this version — there is no feature
+# gating it, so the list below is only the AEAD trait surface and the OS RNG.
+chacha20poly1305 = { version = "=0.10.1", default-features = false, features = [
+    "alloc",
+    "getrandom",
+] }
+# Direct rather than transitive. Both crates above already pull it in, but
+# ADR-0010 step 4 requires the DEK *zeroised* rather than dropped, and that is
+# this crate's `Zeroizing`/`ZeroizeOnDrop` at our own call sites.
+zeroize = { version = "=1.8.2", features = ["derive"] }
+# Constant-time equality for the DEK and the PIN. **Adds nothing to the build**:
+# `chacha20poly1305` and `poly1305` already compile it, so declaring it directly
+# costs one manifest line and no compile unit. The alternative was a plain `==`
+# on key bytes, which is correct on today's only call site — a read-back with no
+# attacker on it — and a footgun on the next one.
+subtle = { version = "=2.6.1", default-features = false }
+# DPAPI: `CryptProtectData` and `CryptUnprotectData`. Calling a Windows API, not
+# hand-rolling cryptography — these are Microsoft's own bindings. Already in the
+# lockfile at this version, reached through `tauri-plugin-dialog`'s `rfd`, so
+# the feature list is the only new thing.
+#
+# **This crate is Windows-only**, which the application already is: `dirs`'
+# `~/.fast-clip`, the tray, the NSIS bundle and DPAPI itself all assume it.
+windows-sys = { version = "=0.61.2", features = [
+    "Win32_Foundation",
+    "Win32_Security_Cryptography",
+    "Win32_System_Memory",
+] }
 
 [dev-dependencies]
 tempfile = "3"

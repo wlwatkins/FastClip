@@ -9,7 +9,9 @@ import {
   type Clip,
   type ClipError,
   type Colour,
+  type ExportResult,
   type ImportReason,
+  type ImportResult,
   type InvalidReason,
   type LockState,
   type Settings,
@@ -95,6 +97,22 @@ export function parseSettings(value: unknown, context = "Settings"): Settings {
     throw new BoundaryValidationError(context, value);
   }
   return { always_on_top: value.always_on_top };
+}
+
+/** Validates `export_clips`'s return (contract §1 `ExportResult`). */
+export function parseExportResult(value: unknown, context = "ExportResult"): ExportResult {
+  if (!isRecord(value) || typeof value.exported !== "number") {
+    throw new BoundaryValidationError(context, value);
+  }
+  return { exported: value.exported };
+}
+
+/** Validates `import_clips`'s return (contract §1 `ImportResult`). */
+export function parseImportResult(value: unknown, context = "ImportResult"): ImportResult {
+  if (!isRecord(value) || typeof value.imported !== "number") {
+    throw new BoundaryValidationError(context, value);
+  }
+  return { imported: value.imported };
 }
 
 const INVALID_REASONS: readonly InvalidReason[] = [

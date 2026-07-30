@@ -54,6 +54,10 @@ feature nobody had written.
 
 WP-13 is numbered last but sequenced before WP-12, which gates on everything.
 
+**Where each package currently stands** is tracked in one place, the per-package
+table in [the gated pipeline](../process/pipeline.md#per-package). This page
+describes the plan; that one describes the position.
+
 ## Every work package ends the same way
 
 1. The developers return implementation reports.

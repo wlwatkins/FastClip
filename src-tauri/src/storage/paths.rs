@@ -23,6 +23,15 @@ pub const KEYFILE: &str = "keyfile";
 pub const KEYFILE_NEW: &str = "keyfile.new";
 /// Plaintext, readable while locked, holds no clip data.
 pub const SETTINGS_FILE: &str = "settings.json";
+/// The intermediate [`SETTINGS_FILE`] is written to before being renamed.
+///
+/// **Not** in [`StorePaths::intermediates`], and that is not an oversight: the
+/// sweep list is fixed by `storage.md` § Startup recovery at four files, and this
+/// one needs none of the protection that list exists to give. It holds a version
+/// number and a boolean — no clip data, in plaintext or otherwise — so a copy
+/// left by a killed process discloses nothing, and the next
+/// `set_always_on_top` truncates it.
+pub const SETTINGS_NEW_FILE: &str = "settings.json.new";
 
 /// Every path the store uses, derived from one directory.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -77,8 +86,25 @@ impl StorePaths {
         self.dir.join(KEYFILE)
     }
 
+    /// The temporary file **every** write to `keyfile` goes through
+    /// (`storage.md` § Every write to `keyfile` is atomic. Every one.).
+    ///
+    /// A sibling of its target, because a rename is atomic only within one
+    /// volume. It is in [`Self::intermediates`], so a crash between the write
+    /// and the rename leaves a file the next launch sweeps.
+    pub fn keyfile_new(&self) -> PathBuf {
+        self.dir.join(KEYFILE_NEW)
+    }
+
     pub fn settings(&self) -> PathBuf {
         self.dir.join(SETTINGS_FILE)
+    }
+
+    /// The temporary file a settings write is renamed from. In the same
+    /// directory as its target, because a rename across volumes is a copy and a
+    /// copy is not atomic.
+    pub fn settings_new(&self) -> PathBuf {
+        self.dir.join(SETTINGS_NEW_FILE)
     }
 
     /// The files that exist only inside a conversion. Any that survives a
@@ -109,6 +135,18 @@ mod tests {
         assert_eq!(paths.db_new(), Path::new("root").join("clips.db.new"));
         assert_eq!(paths.keyfile(), Path::new("root").join("keyfile"));
         assert_eq!(paths.settings(), Path::new("root").join("settings.json"));
+        assert_eq!(
+            paths.settings_new(),
+            Path::new("root").join("settings.json.new")
+        );
+    }
+
+    /// A rename is atomic only within one volume, so the temporary file has to
+    /// be a sibling of its target rather than in the system temporary directory.
+    #[test]
+    fn the_settings_temporary_file_is_a_sibling_of_the_settings_file() {
+        let paths = StorePaths::at("root");
+        assert_eq!(paths.settings_new().parent(), paths.settings().parent());
     }
 
     #[test]

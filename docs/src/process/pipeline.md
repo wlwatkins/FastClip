@@ -42,16 +42,39 @@ deliverable; an ad hoc process teaches nothing reusable.
 
 ## Current position
 
+Both one-off gates are behind us, so position is now tracked per package rather
+than per gate.
+
 | Gate | Status |
 | ---- | ------ |
 | G0a Product | Accepted — [specification](../product/spec.md) |
 | G0b Design | **Landed** — [contract §6](../architecture/contract.md) is empty; `critic` returned `ACCEPT` on the fourth review ([003](../reviews/003-wp-01-contract.md)). Four findings carried to WP-03 and WP-07 |
-| G1 Build | Blocked on G0b |
-| G2 Test | Blocked |
-| G3 Review | Blocked |
-| G4 Merge | Blocked |
 
-## First dispatch
+### Per package
+
+| Package | Position | Review |
+| ------- | -------- | ------ |
+| WP-01 Contract ratification | G4 landed | [003](../reviews/003-wp-01-contract.md) |
+| WP-02 Toolchain and CI skeleton | G4 landed, one G4 condition open | [002](../reviews/002-wp-02-toolchain.md) |
+| WP-03 Storage | G4 landed | folded into WP-05's review |
+| WP-04 Frontend scaffold | G4 landed | folded into WP-05's review |
+| WP-05 Clip list, copy, CRUD | G4 landed | [005](../reviews/005-wp-05-crud.md) |
+| WP-06 Reordering | G4 landed | [007](../reviews/007-wp-06-reorder.md) |
+| WP-07 Optional PIN-gated encryption | G4 landed; one minor test-layer follow-up open | [010](../reviews/010-wp-07-encryption.md) |
+| WP-08 Tray icon | Reworked and re-reviewed; all five findings across both rounds closed. **Cannot exit G4** — waiting on an owner decision (spec §4.8) and a manual tray check | [012](../reviews/012-wp-08-tray.md), [013](../reviews/013-wp-08-rework.md) |
+| WP-09 Export and import | G4 landed | [008](../reviews/008-wp-09-export-import.md) |
+| WP-10 Palette and accessibility | G4 landed | [004](../reviews/004-wp-10-palette.md) |
+| WP-11 Copy deck and README | Reworked, G2 passed. **G3 re-review not run** — dispatched 2026-07-30 and cut short. Re-dispatch before landing | [011](../reviews/011-wp-11-copy-deck.md) |
+| WP-12 Release pipeline | **Blocked, owner** | — |
+| WP-13 Search and filter | G4 landed | [009](../reviews/009-wp-13-search.md) |
+| WP-14 Settings and window state | G4 landed | [006](../reviews/006-wp-14-settings.md) |
+
+WP-12 is blocked on two things only the owner can supply: a signing certificate
+that does not exist, and a definition of done written in terms of CI runs, which
+cannot happen now that the project has no Actions credits. Its DoD needs
+rewriting against a local build before the package can be dispatched.
+
+## The G0b dispatch, kept as the worked example
 
 ```text
 Read docs/src/product/spec.md, docs/src/architecture/contract.md,

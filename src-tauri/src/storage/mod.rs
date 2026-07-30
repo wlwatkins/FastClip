@@ -10,16 +10,17 @@
 pub mod classify;
 pub mod clips;
 pub mod connection;
+pub mod convert;
 pub mod paths;
 pub mod recovery;
 pub mod schema;
 mod store;
 
 pub use classify::Classification;
-pub use clips::ClipRow;
+pub use clips::{ClipRow, TrayClip};
 pub use paths::StorePaths;
 pub use schema::SCHEMA_VERSION;
-pub use store::Store;
+pub use store::{Becoming, Converted, Store};
 
 use std::sync::{Mutex, MutexGuard};
 
@@ -56,9 +57,11 @@ pub(crate) fn open_error(context: &str, error: &rusqlite::Error) -> ClipError {
 /// Take a mutex, recovering rather than panicking if a previous holder panicked.
 ///
 /// `unwrap()` here would be a decision to crash the application because
-/// something else already went wrong. Recovery is sound for both mutexes in this
-/// module: `rusqlite::Transaction` rolls back on drop, so a panic that poisons
-/// the connection mutex cannot leave a transaction open.
+/// something else already went wrong. Recovery is sound for all three mutexes
+/// `Store` holds: `rusqlite::Transaction` rolls back on drop, so a panic that
+/// poisons the connection mutex cannot leave a transaction open, and the status
+/// and conversion mutexes guard a plain struct and a `()`, neither of which a
+/// panic can leave inconsistent.
 pub(crate) fn lock_recovering<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
     match mutex.lock() {
         Ok(guard) => guard,

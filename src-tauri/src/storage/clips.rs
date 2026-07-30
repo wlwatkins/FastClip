@@ -14,13 +14,14 @@
 //! row. Reading one back is a parse, exactly like the `id` column's, and a value
 //! this build cannot interpret is `storage` rather than a panic.
 
+use std::collections::HashSet;
 use std::fmt;
 
 use rusqlite::{Connection, Transaction, TransactionBehavior};
 use uuid::Uuid;
 
 use crate::colour::Colour;
-use crate::error::ClipError;
+use crate::error::{ClipError, InvalidReason};
 use crate::redact::Redacted;
 use crate::storage::storage_error;
 
@@ -53,6 +54,87 @@ impl fmt::Debug for ClipRow {
             .field("position", &self.position)
             .finish()
     }
+}
+
+/// A clip's content, before the backend has minted an identity for it.
+///
+/// The input shape of [`import`]. It borrows rather than owns because the caller
+/// already holds the validated clips and an import of ten thousand rows should
+/// not copy every `value` to hand them over.
+///
+/// **No `Debug`, by omission and on purpose.** It holds a `label` and a `value`,
+/// so a derive here would be the one line that puts a user's clip into a log
+/// (ADR-0002). Nothing formats it; [`ClipRow`] is the type that does, and it
+/// redacts.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct ClipContent<'a> {
+    pub label: &'a str,
+    pub value: &'a str,
+    pub colour: Colour,
+}
+
+/// One entry of the tray ranking: an id and a label, and nothing else.
+///
+/// **There is no `value` field, and [`ranked_for_tray`] does not select the
+/// `value` column.** Spec §4.5 puts labels in the tray menu; a clip `value` has
+/// no route into a native menu string, structurally rather than by every caller
+/// remembering not to put one there.
+#[derive(Clone, PartialEq, Eq)]
+pub struct TrayClip {
+    pub id: Uuid,
+    pub label: String,
+}
+
+/// Hand-written for the same reason [`ClipRow`]'s is: a `{:?}` anywhere must not
+/// print what the user stored (ADR-0002).
+impl fmt::Debug for TrayClip {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("TrayClip")
+            .field("id", &self.id)
+            .field("label", &Redacted::of(&self.label))
+            .finish()
+    }
+}
+
+/// The tray ranking: at most `limit` clips, descending `use_count`, with the
+/// user's list order breaking ties and filling the remaining slots.
+///
+/// **One `ORDER BY` expresses the whole of spec §4.5**, and it is one query
+/// rather than two passes because "the ten most used" and "ten clips ranked by
+/// use, ties broken by list order" are different rules and only the second one
+/// is specified. A fresh install has every `use_count` at 0, so every clip ties
+/// and `position ASC` alone decides — which is exactly the specification's
+/// "the user's list order fills the remaining slots", and why the menu is
+/// populated before any clip has been used once.
+///
+/// An eleventh clip is therefore absent until its count strictly exceeds that of
+/// something above it, or ties with it and sits earlier in the list.
+pub fn ranked_for_tray(connection: &Connection, limit: usize) -> Result<Vec<TrayClip>, ClipError> {
+    // `usize` cannot exceed `i64` on any target this ships to, and saturating
+    // rather than unwrapping keeps the failure — if one ever existed — a larger
+    // menu instead of a panic on the tray path.
+    let limit = i64::try_from(limit).unwrap_or(i64::MAX);
+
+    let mut statement = connection
+        .prepare("SELECT id, label FROM clips ORDER BY use_count DESC, position ASC LIMIT ?1")
+        .map_err(|e| storage_error("the tray ranking could not be prepared", &e))?;
+
+    let rows = statement
+        .query_map([limit], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+        })
+        .map_err(|e| storage_error("the tray ranking could not be read", &e))?;
+
+    let mut ranked = Vec::new();
+    for row in rows {
+        let (id, label) =
+            row.map_err(|e| storage_error("a tray ranking row could not be read", &e))?;
+        ranked.push(TrayClip {
+            id: parse_id(&id)?,
+            label,
+        });
+    }
+    Ok(ranked)
 }
 
 /// The stored form of an id: lowercase, hyphenated, 36 characters.
@@ -153,6 +235,80 @@ pub fn insert(
     Ok(id)
 }
 
+/// Append a validated import in one transaction (WP-09).
+///
+/// **Phase two of the import** (contract, `import_clips`). Phase one validated
+/// the whole file in memory and is over; this is the write, and it is one
+/// `BEGIN IMMEDIATE` transaction so that a failure at any clip leaves the store
+/// exactly as it was. `BEGIN IMMEDIATE` rather than the default deferred
+/// transaction, so the write lock is taken at the start and a concurrent writer
+/// cannot make a lock upgrade fail halfway through.
+///
+/// The atomicity is SQLite's. A staging table or a backup-and-restore around
+/// the merge would reimplement it worse (ADR-0005, closed question 10).
+///
+/// **Merge only.** Every clip is appended with a freshly minted id and
+/// `use_count` 0. Nothing is deleted, nothing is overwritten, and there is no
+/// deduplication — importing the same file twice produces two copies of every
+/// clip, which follows from "import never overwrites" and is asserted below so
+/// it is not mistaken for a defect.
+///
+/// Positions continue from the current maximum, so the user's existing order is
+/// untouched and no renumber is needed: the new rows occupy positions nothing
+/// else holds (`storage.md` § Position is dense).
+pub fn import(
+    connection: &mut Connection,
+    imported: &[ClipContent<'_>],
+) -> Result<usize, ClipError> {
+    let transaction = connection
+        .transaction_with_behavior(TransactionBehavior::Immediate)
+        .map_err(|e| storage_error("an import transaction could not be opened", &e))?;
+
+    let base: i64 = transaction
+        .query_row(
+            "SELECT COALESCE(MAX(position), -1) + 1 FROM clips",
+            [],
+            |row| row.get(0),
+        )
+        .map_err(|e| storage_error("the append position could not be read", &e))?;
+
+    {
+        let mut statement = transaction
+            .prepare(
+                "INSERT INTO clips (id, label, value, colour, use_count, position)
+                 VALUES (?1, ?2, ?3, ?4, 0, ?5)",
+            )
+            .map_err(|e| storage_error("the import statement could not be prepared", &e))?;
+
+        for (offset, clip) in imported.iter().enumerate() {
+            let position = match i64::try_from(offset) {
+                Ok(offset) => base.saturating_add(offset),
+                Err(_) => {
+                    log::error!("an import carried more clips than a position can count");
+                    return Err(ClipError::Storage);
+                }
+            };
+            statement
+                .execute((
+                    id_text(Uuid::new_v4()),
+                    clip.label,
+                    clip.value,
+                    clip.colour,
+                    position,
+                ))
+                // Dropping the transaction rolls back every clip inserted so
+                // far. A half-applied import is worse than one that fails.
+                .map_err(|e| storage_error("a clip could not be imported", &e))?;
+        }
+    }
+
+    transaction
+        .commit()
+        .map_err(|e| storage_error("an import could not be committed", &e))?;
+
+    Ok(imported.len())
+}
+
 /// Rewrite a clip's content. `id`, `position` and `use_count` are unchanged.
 ///
 /// An unknown id is `not_found`; it never creates a clip.
@@ -244,6 +400,69 @@ pub fn delete(connection: &mut Connection, id: Uuid) -> Result<(), ClipError> {
     transaction
         .commit()
         .map_err(|e| storage_error("a delete could not be committed", &e))
+}
+
+/// `invalid_input { field: "order", reason: "not_a_permutation" }`.
+///
+/// One constructor, so the rejection cannot acquire a second spelling. It names
+/// the argument and never the ids it was given — an id is not a secret, but the
+/// frontend's recovery is to resynchronise, and there is nothing in a list of
+/// ids it can act on that `update_clips` does not already carry.
+fn not_a_permutation() -> ClipError {
+    ClipError::InvalidInput {
+        field: "order".to_owned(),
+        reason: InvalidReason::NotAPermutation,
+    }
+}
+
+/// Whether `order` is an exact permutation of `stored`: same length, same
+/// members, no duplicates (ADR-0007).
+///
+/// `stored` comes from the `id` column, which is the primary key, so it holds no
+/// duplicates of its own. Equal lengths plus "every element of `order` is in
+/// `stored`, and distinct" is therefore exactly the permutation property.
+fn is_permutation_of(stored: &[Uuid], order: &[Uuid]) -> bool {
+    if stored.len() != order.len() {
+        return false;
+    }
+    let known: HashSet<Uuid> = stored.iter().copied().collect();
+    let mut seen: HashSet<Uuid> = HashSet::with_capacity(order.len());
+    order
+        .iter()
+        .all(|id| known.contains(id) && seen.insert(*id))
+}
+
+/// Apply a complete permutation of the stored id set, in one transaction.
+///
+/// **The argument is validated against the store inside the transaction**, so
+/// the set it is checked against is the set that is then rewritten. An `order`
+/// that omits a clip, adds one, or repeats one is rejected whole with
+/// [`not_a_permutation`] and nothing is written — never applied to the part of
+/// the list that did match (contract, `reorder_clips`; ADR-0007).
+///
+/// The rejection is `invalid_input` and never `not_found`, even when the only
+/// fault is one unknown id: the whole argument is wrong, not one element of it.
+///
+/// A crash at any instant leaves the old order or the new one, dense either way.
+/// The transaction is what gives that; the offset-then-write pair inside
+/// [`renumber`] is what keeps `UNIQUE(position)` from failing on the way.
+pub fn reorder(connection: &mut Connection, order: &[Uuid]) -> Result<(), ClipError> {
+    let transaction = connection
+        .transaction_with_behavior(TransactionBehavior::Immediate)
+        .map_err(|e| storage_error("a reorder transaction could not be opened", &e))?;
+
+    let stored = ids_in_order(&transaction)?;
+    if !is_permutation_of(&stored, order) {
+        // Dropping the transaction rolls it back. Nothing was written in any
+        // case: the check precedes the first `UPDATE`.
+        return Err(not_a_permutation());
+    }
+
+    renumber(&transaction, order)?;
+
+    transaction
+        .commit()
+        .map_err(|e| storage_error("a reorder could not be committed", &e))
 }
 
 /// Write `ordered` into `position` `0..N-1`, as an offset-then-write pair.
@@ -623,6 +842,239 @@ mod tests {
         assert_eq!(count(&connection), Ok(1));
     }
 
+    // ---- reorder (WP-06) ----
+
+    fn rejected() -> ClipError {
+        ClipError::InvalidInput {
+            field: "order".into(),
+            reason: InvalidReason::NotAPermutation,
+        }
+    }
+
+    #[test]
+    fn a_reorder_applies_the_permutation_and_keeps_the_order_dense() {
+        let (_dir, mut connection) = store();
+        let ids: Vec<Uuid> = (0..5)
+            .map(|n| add(&connection, &format!("clip {n}")))
+            .collect();
+
+        let moved = vec![ids[3], ids[0], ids[4], ids[1], ids[2]];
+        assert_eq!(reorder(&mut connection, &moved), Ok(()));
+
+        assert_eq!(ids_in_order(&connection), Ok(moved));
+        assert_eq!(positions(&connection), vec![0, 1, 2, 3, 4]);
+    }
+
+    /// The case `UNIQUE(position)` makes hostile: every row moves, and a naive
+    /// in-place write collides on the first statement.
+    #[test]
+    fn a_full_reversal_is_applied_without_a_unique_violation() {
+        let (_dir, mut connection) = store();
+        let ids: Vec<Uuid> = (0..8)
+            .map(|n| add(&connection, &format!("clip {n}")))
+            .collect();
+
+        let reversed: Vec<Uuid> = ids.iter().rev().copied().collect();
+        assert_eq!(reorder(&mut connection, &reversed), Ok(()));
+        assert_eq!(ids_in_order(&connection), Ok(reversed));
+        assert_eq!(positions(&connection), (0..8).collect::<Vec<i64>>());
+    }
+
+    /// Reordering twice in a row is the ordinary case — a second drag lands on
+    /// rows whose rowid order no longer resembles their position order.
+    #[test]
+    fn reordering_repeatedly_never_breaks_the_dense_invariant() {
+        let (_dir, mut connection) = store();
+        let ids: Vec<Uuid> = (0..6)
+            .map(|n| add(&connection, &format!("clip {n}")))
+            .collect();
+
+        let mut current = ids.clone();
+        for _ in 0..6 {
+            // Rotate by one: every row moves on every pass.
+            current.rotate_left(1);
+            assert_eq!(reorder(&mut connection, &current), Ok(()));
+            assert_eq!(ids_in_order(&connection), Ok(current.clone()));
+            assert_eq!(positions(&connection), (0..6).collect::<Vec<i64>>());
+        }
+        // Six rotations of six ids returns the original order.
+        assert_eq!(ids_in_order(&connection), Ok(ids));
+    }
+
+    #[test]
+    fn an_order_that_omits_a_clip_is_rejected_whole() {
+        let (_dir, mut connection) = store();
+        let ids: Vec<Uuid> = (0..3)
+            .map(|n| add(&connection, &format!("clip {n}")))
+            .collect();
+
+        assert_eq!(reorder(&mut connection, &ids[..2]), Err(rejected()));
+        // Not one row moved. A partial application is the failure this command
+        // exists to make impossible.
+        assert_eq!(ids_in_order(&connection), Ok(ids));
+        assert_eq!(positions(&connection), vec![0, 1, 2]);
+    }
+
+    /// A clip created between the frontend's last list and the drop. The stale
+    /// order is refused rather than applied to the subset it does cover.
+    #[test]
+    fn an_order_that_names_an_unknown_clip_is_not_a_permutation_rather_than_not_found() {
+        let (_dir, mut connection) = store();
+        let ids: Vec<Uuid> = (0..3)
+            .map(|n| add(&connection, &format!("clip {n}")))
+            .collect();
+
+        let stale = vec![ids[2], ids[1], Uuid::new_v4()];
+        assert_eq!(reorder(&mut connection, &stale), Err(rejected()));
+        assert_eq!(ids_in_order(&connection), Ok(ids));
+        assert_eq!(positions(&connection), vec![0, 1, 2]);
+    }
+
+    #[test]
+    fn an_order_that_repeats_a_clip_is_rejected_even_at_the_right_length() {
+        let (_dir, mut connection) = store();
+        let ids: Vec<Uuid> = (0..3)
+            .map(|n| add(&connection, &format!("clip {n}")))
+            .collect();
+
+        // Right length, right membership for two of three, one id twice. Without
+        // the duplicate check this would renumber two rows and leave the third
+        // holding an offset position outside `0..N-1`.
+        let duplicated = vec![ids[0], ids[1], ids[1]];
+        assert_eq!(reorder(&mut connection, &duplicated), Err(rejected()));
+        assert_eq!(ids_in_order(&connection), Ok(ids));
+        assert_eq!(positions(&connection), vec![0, 1, 2]);
+    }
+
+    #[test]
+    fn an_order_longer_than_the_store_is_rejected() {
+        let (_dir, mut connection) = store();
+        let ids: Vec<Uuid> = (0..2)
+            .map(|n| add(&connection, &format!("clip {n}")))
+            .collect();
+
+        let mut too_long = ids.clone();
+        too_long.push(Uuid::new_v4());
+        assert_eq!(reorder(&mut connection, &too_long), Err(rejected()));
+        assert_eq!(ids_in_order(&connection), Ok(ids));
+    }
+
+    /// An empty store and an empty order agree, so the permutation is exact and
+    /// there is nothing to write. Not reachable from the frontend, which never
+    /// drags in an empty list, but it must not be an error and must not renumber.
+    #[test]
+    fn an_empty_order_against_an_empty_store_succeeds_and_writes_nothing() {
+        let (_dir, mut connection) = store();
+        assert_eq!(reorder(&mut connection, &[]), Ok(()));
+        assert_eq!(count(&connection), Ok(0));
+    }
+
+    /// The mirror of the case above: an empty order against a store that holds
+    /// clips is a length mismatch, not an instruction to clear the order.
+    #[test]
+    fn an_empty_order_against_a_populated_store_is_rejected() {
+        let (_dir, mut connection) = store();
+        let ids: Vec<Uuid> = (0..2)
+            .map(|n| add(&connection, &format!("clip {n}")))
+            .collect();
+
+        assert_eq!(reorder(&mut connection, &[]), Err(rejected()));
+        assert_eq!(ids_in_order(&connection), Ok(ids));
+        assert_eq!(positions(&connection), vec![0, 1]);
+    }
+
+    /// **The half-applied order, made to happen.** The renumber runs in full and
+    /// the transaction is then abandoned without committing, which is what a
+    /// process killed between the offset write and the commit leaves behind. The
+    /// store must read back as the order it held before, dense — not the new
+    /// order, and not the intermediate `+N` positions the offset step wrote.
+    #[test]
+    fn a_reorder_abandoned_before_its_commit_leaves_the_old_order_intact() {
+        let (_dir, mut connection) = store();
+        let ids: Vec<Uuid> = (0..5)
+            .map(|n| add(&connection, &format!("clip {n}")))
+            .collect();
+
+        let reversed: Vec<Uuid> = ids.iter().rev().copied().collect();
+        {
+            let transaction =
+                match connection.transaction_with_behavior(TransactionBehavior::Immediate) {
+                    Ok(transaction) => transaction,
+                    Err(e) => panic!("the transaction should open: {e}"),
+                };
+            if let Err(e) = renumber(&transaction, &reversed) {
+                panic!("the renumber should succeed: {e}");
+            }
+            // Inside the transaction the new order is already visible.
+            assert_eq!(ids_in_order(&transaction), Ok(reversed.clone()));
+            // No commit. Dropping rolls it back.
+        }
+
+        assert_eq!(ids_in_order(&connection), Ok(ids));
+        assert_eq!(positions(&connection), vec![0, 1, 2, 3, 4]);
+    }
+
+    /// A reorder and a delete compose: the order the user set survives the row
+    /// removal, and the remainder is renumbered against it rather than against
+    /// insertion order.
+    #[test]
+    fn a_delete_after_a_reorder_preserves_the_users_order_for_the_remainder() {
+        let (_dir, mut connection) = store();
+        let ids: Vec<Uuid> = (0..4)
+            .map(|n| add(&connection, &format!("clip {n}")))
+            .collect();
+
+        let moved = vec![ids[2], ids[0], ids[3], ids[1]];
+        if let Err(e) = reorder(&mut connection, &moved) {
+            panic!("the reorder should succeed: {e}");
+        }
+        if let Err(e) = delete(&mut connection, ids[3]) {
+            panic!("the delete should succeed: {e}");
+        }
+
+        assert_eq!(ids_in_order(&connection), Ok(vec![ids[2], ids[0], ids[1]]));
+        assert_eq!(positions(&connection), vec![0, 1, 2]);
+    }
+
+    /// An insert after a reorder appends to the end of the user's order, because
+    /// the position is the maximum plus one and the maximum is dense.
+    #[test]
+    fn an_insert_after_a_reorder_appends_to_the_end_of_the_users_order() {
+        let (_dir, mut connection) = store();
+        let ids: Vec<Uuid> = (0..3)
+            .map(|n| add(&connection, &format!("clip {n}")))
+            .collect();
+
+        let reversed: Vec<Uuid> = ids.iter().rev().copied().collect();
+        if let Err(e) = reorder(&mut connection, &reversed) {
+            panic!("the reorder should succeed: {e}");
+        }
+        let appended = add(&connection, "newest");
+
+        let mut expected = reversed;
+        expected.push(appended);
+        assert_eq!(ids_in_order(&connection), Ok(expected));
+        assert_eq!(positions(&connection), vec![0, 1, 2, 3]);
+    }
+
+    /// The predicate on its own, including the shapes the store cannot produce.
+    #[test]
+    fn the_permutation_check_accepts_only_an_exact_rearrangement() {
+        let ids: Vec<Uuid> = (0..4).map(|_| Uuid::new_v4()).collect();
+        let other = Uuid::new_v4();
+
+        assert!(is_permutation_of(&ids, &ids));
+        let reversed: Vec<Uuid> = ids.iter().rev().copied().collect();
+        assert!(is_permutation_of(&ids, &reversed));
+        assert!(is_permutation_of(&[], &[]));
+
+        assert!(!is_permutation_of(&ids, &ids[..3]));
+        assert!(!is_permutation_of(&ids, &[ids[0], ids[1], ids[2], other]));
+        assert!(!is_permutation_of(&ids, &[ids[0], ids[1], ids[2], ids[2]]));
+        assert!(!is_permutation_of(&ids, &[]));
+        assert!(!is_permutation_of(&[], &[other]));
+    }
+
     #[test]
     fn renumber_refuses_a_partial_id_set_rather_than_leaving_a_sparse_order() {
         let (_dir, mut connection) = store();
@@ -639,5 +1091,241 @@ mod tests {
         drop(transaction);
 
         assert_eq!(positions(&connection), vec![0, 1, 2]);
+    }
+
+    // ---- import (WP-09) ----
+
+    fn content<'a>(label: &'a str, value: &'a str) -> ClipContent<'a> {
+        ClipContent {
+            label,
+            value,
+            colour: Colour::Teal,
+        }
+    }
+
+    #[test]
+    fn an_import_appends_after_the_existing_clips_and_keeps_the_order_dense() {
+        let (_dir, mut connection) = store();
+        add(&connection, "mine one");
+        add(&connection, "mine two");
+
+        let imported = [content("theirs one", "v1"), content("theirs two", "v2")];
+        assert_eq!(import(&mut connection, &imported), Ok(2));
+
+        let listed = rows(&connection);
+        let labels: Vec<&str> = listed.iter().map(|c| c.label.as_str()).collect();
+        assert_eq!(
+            labels,
+            vec!["mine one", "mine two", "theirs one", "theirs two"]
+        );
+        assert_eq!(positions(&connection), vec![0, 1, 2, 3]);
+    }
+
+    /// An import continues from the current maximum, so it needs no
+    /// offset-then-write pair: the new rows occupy positions nothing else holds
+    /// (`storage.md` § Position is dense). The case that would catch a mistake
+    /// is an import after a reorder, when rowid order and position order have
+    /// nothing to do with each other.
+    #[test]
+    fn an_import_after_a_reorder_appends_to_the_end_of_the_users_order() {
+        let (_dir, mut connection) = store();
+        let ids: Vec<Uuid> = (0..4)
+            .map(|n| add(&connection, &format!("clip {n}")))
+            .collect();
+        let reversed: Vec<Uuid> = ids.iter().rev().copied().collect();
+        if let Err(e) = reorder(&mut connection, &reversed) {
+            panic!("the reorder should succeed: {e}");
+        }
+
+        assert_eq!(import(&mut connection, &[content("appended", "v")]), Ok(1));
+
+        let mut expected: Vec<String> = reversed
+            .iter()
+            .enumerate()
+            .map(|(n, _)| format!("clip {}", 3 - n))
+            .collect();
+        expected.push("appended".into());
+        let labels: Vec<String> = rows(&connection).iter().map(|c| c.label.clone()).collect();
+        assert_eq!(labels, expected);
+        assert_eq!(positions(&connection), vec![0, 1, 2, 3, 4]);
+    }
+
+    #[test]
+    fn an_empty_import_succeeds_and_writes_nothing() {
+        let (_dir, mut connection) = store();
+        add(&connection, "mine");
+        assert_eq!(import(&mut connection, &[]), Ok(0));
+        assert_eq!(count(&connection), Ok(1));
+        assert_eq!(positions(&connection), vec![0]);
+    }
+
+    /// Every imported clip is a distinct row with a fresh id and a `use_count`
+    /// of zero, even when the file held the same content twice. Import never
+    /// deduplicates (contract, `import_clips`).
+    #[test]
+    fn identical_clips_in_one_import_become_distinct_rows_at_a_zero_count() {
+        let (_dir, mut connection) = store();
+        let same = content("same", "same value");
+        assert_eq!(import(&mut connection, &[same, same, same]), Ok(3));
+
+        let listed = rows(&connection);
+        assert_eq!(listed.len(), 3);
+        assert!(listed.iter().all(|row| row.use_count == 0));
+        let ids: HashSet<Uuid> = listed.iter().map(|row| row.id).collect();
+        assert_eq!(ids.len(), 3);
+    }
+
+    /// **The half-applied import, made to happen.** A clip whose insert fails
+    /// mid-run must take the whole import with it: the row that collides is the
+    /// last one, so every clip before it has already been written inside the
+    /// transaction when the failure lands.
+    #[test]
+    fn an_import_that_fails_part_way_rolls_back_every_clip_before_it() {
+        let (_dir, mut connection) = store();
+        add(&connection, "mine");
+
+        // A `CHECK (use_count >= 0)` cannot be tripped from here, so the fault
+        // is injected where a real one would land: a unique `position` already
+        // taken by a row this import is about to write over. The trigger fires
+        // on the third insert.
+        if let Err(e) = connection.execute_batch(
+            "CREATE TRIGGER refuse_the_third BEFORE INSERT ON clips
+             WHEN NEW.position = 3
+             BEGIN SELECT RAISE(ABORT, 'refused'); END",
+        ) {
+            panic!("the fixture trigger should be creatable: {e}");
+        }
+
+        let imported = [
+            content("one", "v"),
+            content("two", "v"),
+            content("three", "v"),
+            content("four", "v"),
+        ];
+        assert_eq!(import(&mut connection, &imported), Err(ClipError::Storage));
+
+        // Not one imported clip survived, and the user's own is untouched.
+        let listed = rows(&connection);
+        let labels: Vec<&str> = listed.iter().map(|c| c.label.as_str()).collect();
+        assert_eq!(labels, vec!["mine"]);
+        assert_eq!(positions(&connection), vec![0]);
+    }
+
+    // ---- the tray ranking (WP-08) ----
+
+    fn ranked(connection: &Connection, limit: usize) -> Vec<String> {
+        match ranked_for_tray(connection, limit) {
+            Ok(ranked) => ranked.into_iter().map(|clip| clip.label).collect(),
+            Err(e) => panic!("the tray ranking should succeed: {e}"),
+        }
+    }
+
+    fn copy_it(connection: &Connection, id: Uuid, times: usize) {
+        for _ in 0..times {
+            if let Err(e) = increment_use_count(connection, id) {
+                panic!("the increment should succeed: {e}");
+            }
+        }
+    }
+
+    #[test]
+    fn an_empty_store_ranks_nothing_and_is_not_an_error() {
+        let (_dir, connection) = store();
+        assert_eq!(ranked(&connection, 10), Vec::<String>::new());
+    }
+
+    /// Spec §4.5's second clause: with every count at 0 the ranking *is* the
+    /// user's list order, so a fresh install has a populated menu and a clip
+    /// added today is reachable before it has been used once.
+    #[test]
+    fn an_unused_store_ranks_in_list_order() {
+        let (_dir, connection) = store();
+        add(&connection, "first");
+        add(&connection, "second");
+        add(&connection, "third");
+
+        assert_eq!(ranked(&connection, 10), vec!["first", "second", "third"]);
+    }
+
+    #[test]
+    fn a_higher_count_outranks_an_earlier_position() {
+        let (_dir, connection) = store();
+        add(&connection, "first");
+        let second = add(&connection, "second");
+        add(&connection, "third");
+
+        copy_it(&connection, second, 1);
+        assert_eq!(ranked(&connection, 10), vec!["second", "first", "third"]);
+    }
+
+    /// "Ties in `use_count` break by list order" — not by insertion order, not
+    /// by id, and not by whichever row SQLite reached first.
+    #[test]
+    fn equal_counts_break_by_list_order() {
+        let (_dir, mut connection) = store();
+        let first = add(&connection, "first");
+        let second = add(&connection, "second");
+        let third = add(&connection, "third");
+
+        copy_it(&connection, third, 2);
+        copy_it(&connection, first, 2);
+        copy_it(&connection, second, 2);
+
+        assert_eq!(ranked(&connection, 10), vec!["first", "second", "third"]);
+
+        // And the tie follows the list when the list moves.
+        if let Err(e) = reorder(&mut connection, &[third, second, first]) {
+            panic!("the reorder should succeed: {e}");
+        }
+        assert_eq!(ranked(&connection, 10), vec!["third", "second", "first"]);
+    }
+
+    /// At most ten, and the eleventh is absent until its count overtakes
+    /// something above it.
+    #[test]
+    fn the_eleventh_clip_is_absent_until_its_count_overtakes_another() {
+        let (_dir, connection) = store();
+        let mut ids = Vec::new();
+        for n in 0..12 {
+            ids.push(add(&connection, &format!("clip {n}")));
+        }
+
+        let listed = ranked(&connection, 10);
+        assert_eq!(listed.len(), 10);
+        assert_eq!(listed.first().map(String::as_str), Some("clip 0"));
+        assert_eq!(listed.last().map(String::as_str), Some("clip 9"));
+        assert!(!listed.iter().any(|label| label == "clip 10"));
+        assert!(!listed.iter().any(|label| label == "clip 11"));
+
+        // One copy of the eleventh puts it at the top and pushes the last
+        // unused clip out.
+        copy_it(&connection, ids[10], 1);
+        let listed = ranked(&connection, 10);
+        assert_eq!(listed.first().map(String::as_str), Some("clip 10"));
+        assert_eq!(listed.len(), 10);
+        assert!(!listed.iter().any(|label| label == "clip 9"));
+    }
+
+    #[test]
+    fn fewer_clips_than_the_limit_returns_all_of_them() {
+        let (_dir, connection) = store();
+        add(&connection, "only");
+        assert_eq!(ranked(&connection, 10), vec!["only"]);
+    }
+
+    /// The tray shows labels. The query does not select `value` at all, so this
+    /// asserts the shape of the type rather than a filter someone could relax.
+    #[test]
+    fn the_ranking_carries_no_clip_value_and_its_debug_redacts_the_label() {
+        let (_dir, connection) = store();
+        add(&connection, "a secret label");
+
+        let ranked = match ranked_for_tray(&connection, 10) {
+            Ok(ranked) => ranked,
+            Err(e) => panic!("the tray ranking should succeed: {e}"),
+        };
+        let rendered = format!("{ranked:?}");
+        assert!(!rendered.contains("a secret label"), "{rendered}");
+        assert!(!rendered.contains("a value"), "{rendered}");
     }
 }

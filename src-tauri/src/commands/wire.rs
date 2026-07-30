@@ -77,6 +77,81 @@ impl From<ClipRow> for Clip {
     }
 }
 
+/// What `get_lock_state` returns and the `lock_state` event carries
+/// (contract §1, `LockState`). Complete, never a delta.
+///
+/// The four fields are not independent, and the contract fixes the dependencies:
+/// `encryption_enabled: false` implies `locked: false`, and the reverse
+/// combination is a backend defect. `attempts_remaining` is `null` when `locked`
+/// is false, and `retry_after_ms` is `null` when no wait is pending.
+///
+/// No field of this type can carry clip data, so the `Debug` derive is safe.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+pub struct LockState {
+    pub encryption_enabled: bool,
+    pub locked: bool,
+    pub attempts_remaining: Option<u32>,
+    pub retry_after_ms: Option<u64>,
+}
+
+impl LockState {
+    /// The answer for a store that is not encrypted, which is the default.
+    pub const UNENCRYPTED: Self = Self {
+        encryption_enabled: false,
+        locked: false,
+        attempts_remaining: None,
+        retry_after_ms: None,
+    };
+
+    /// **The payload [`crate::commands::lock::lock`] emits, fixed by contract
+    /// §2** — `attempts_remaining` is 5 and `retry_after_ms` is `null` "in every
+    /// case".
+    ///
+    /// A constant rather than a value derived from the store, and the difference
+    /// is load-bearing twice over:
+    ///
+    /// - **Deriving it reads `keyfile`, and that read can fail.** It would fail
+    ///   *after* the lock had taken effect, so a `?` on it would return an error
+    ///   `lock` does not declare and skip the emission entirely — leaving the
+    ///   frontend's `locked` false, and the clip list, any open form and the
+    ///   search query all still on screen over a store whose key has been given
+    ///   up. That is
+    ///   [criterion 10](../../../docs/src/product/spec.md#8-acceptance-criteria)
+    ///   on the one gesture that exists to prevent it.
+    /// - **The contract fixes the numbers.** A successful `unlock` resets the
+    ///   counter, so an unlocked store has a clear one; `lock` is not a failed
+    ///   attempt and never starts a backoff.
+    ///
+    /// The counter on disk can disagree in one case: `unlock`'s reset is
+    /// absorbed on failure (`storage.md` § Every write to `keyfile` is atomic.
+    /// Every one.), so a stale count can survive. The contract's answer is the
+    /// constant, and the next launch's `get_lock_state` reads the file and
+    /// corrects it.
+    pub const LOCKED: Self = Self {
+        encryption_enabled: true,
+        locked: true,
+        attempts_remaining: Some(5),
+        retry_after_ms: None,
+    };
+
+    /// The payload a successful [`crate::commands::lock::unlock`] emits.
+    ///
+    /// A constant for the same reason as [`Self::LOCKED`], one step weaker: the
+    /// derivation cannot fail on this path today, because it reads `keyfile`
+    /// only while the store is *locked* and this runs after it has opened. But
+    /// that is a property of a function elsewhere, and the shape — a fallible
+    /// step after the state has already changed — is exactly what F1 was. The
+    /// state here is known exactly, so nothing is lost by saying it outright.
+    ///
+    /// Contract §1: `attempts_remaining` is `null` whenever `locked` is false.
+    pub const UNLOCKED: Self = Self {
+        encryption_enabled: true,
+        locked: false,
+        attempts_remaining: None,
+        retry_after_ms: None,
+    };
+}
+
 /// The lenient form of the `clip` argument, for `create_clip` and
 /// `update_clip` alike.
 ///
@@ -137,7 +212,7 @@ fn invalid(field: &str, reason: InvalidReason) -> ClipError {
 /// argument on that page. `JSON.stringify` drops a key whose value is
 /// `undefined`, so this is the shape of any frontend bug that lets a variable go
 /// undefined — not an exotic case.
-fn require<T>(field: &str, argument: Option<T>) -> Result<T, ClipError> {
+pub(crate) fn require<T>(field: &str, argument: Option<T>) -> Result<T, ClipError> {
     argument.ok_or_else(|| invalid(field, InvalidReason::Required))
 }
 
@@ -212,6 +287,50 @@ fn parse_uuid(field: &str, text: &str) -> Result<Uuid, ClipError> {
 pub fn require_clip_id(clip_id: Option<String>) -> Result<Uuid, ClipError> {
     let text = require("clip_id", clip_id)?;
     parse_uuid("clip_id", &text)
+}
+
+/// The `order` argument of `reorder_clips`: every clip id, in the new display
+/// order (ADR-0007).
+///
+/// This checks only what can be decided without the store — the argument is
+/// present, and every element is a UUID. Whether the ids are an exact
+/// permutation of the stored set is a question about the store, and it is
+/// answered inside the same transaction that rewrites the positions
+/// ([`crate::storage::clips::reorder`]).
+///
+/// A malformed element is `invalid_input { field: "order", … }` rather than
+/// naming an index. Contract §2 lists `malformed_uuid` among this command's
+/// reasons but gives no per-element field spelling, and the frontend's recovery
+/// — discard the drag, render the last `update_clips` — is the same whichever
+/// element was wrong.
+pub fn require_order(order: Option<Vec<String>>) -> Result<Vec<Uuid>, ClipError> {
+    let texts = require("order", order)?;
+    texts.iter().map(|text| parse_uuid("order", text)).collect()
+}
+
+/// The `path` argument of `export_clips` and `import_clips` (WP-09).
+///
+/// Contract §4, *Validation rules*: the only rule on `path` is that it is
+/// non-empty, and the only failure is `required`. **Absoluteness and the `.json`
+/// extension are deliberately not checked here.** The contract describes the
+/// argument as an absolute path to a `.json` file and gives no `InvalidReason`
+/// for either condition, so a backend that invented one would reject with a
+/// reason the frontend cannot map. A path that does not resolve fails as `io`
+/// against the path the user chose, which is the truth about what happened.
+///
+/// Whitespace-only is `required`, on the same reasoning as a whitespace-only
+/// label: it is not a path, and treating it as one would report a filesystem
+/// fault for an empty field.
+///
+/// The rejected text is not echoed. A path is not a clip, but it is the user's
+/// filesystem and there is nothing the frontend can do with it that it does not
+/// already know.
+pub fn require_path(path: Option<String>) -> Result<String, ClipError> {
+    let path = require("path", path)?;
+    if path.trim().is_empty() {
+        return Err(invalid("path", InvalidReason::Required));
+    }
+    Ok(path)
 }
 
 /// The three fields `Clip` and `ClipDraft` share, in the order contract §2
@@ -501,6 +620,85 @@ mod tests {
         );
     }
 
+    /// Contract §4, *Validation rules*: `path` is non-empty, and `required` is
+    /// its only failure. An absent argument names itself.
+    #[test]
+    fn a_path_is_required_and_must_not_be_blank() {
+        assert_eq!(
+            require_path(None),
+            Err(rejected("path", InvalidReason::Required))
+        );
+        for blank in ["", " ", "\t", "\n", "   "] {
+            assert_eq!(
+                require_path(Some(blank.into())),
+                Err(rejected("path", InvalidReason::Required)),
+                "{blank:?} should be refused"
+            );
+        }
+    }
+
+    /// Absoluteness and the extension are not checked: the contract declares no
+    /// reason for either, and inventing one would reject with a value the
+    /// frontend cannot map. What arrives is what the command uses, unmodified.
+    #[test]
+    fn a_path_is_taken_as_it_arrives_without_being_normalised() {
+        for path in [
+            "C:\\Users\\someone\\clips.json",
+            "clips.json",
+            "..\\clips.txt",
+            "/home/someone/clips.json",
+            " C:\\padded.json ",
+        ] {
+            assert_eq!(require_path(Some(path.into())), Ok(path.to_string()));
+        }
+    }
+
+    /// Contract §2, `reorder_clips`: an absent `order` is `required`, and the
+    /// field is the argument's wire name.
+    #[test]
+    fn an_absent_order_argument_names_the_argument() {
+        assert_eq!(
+            require_order(None),
+            Err(rejected("order", InvalidReason::Required))
+        );
+    }
+
+    /// An empty array is present. Whether it is *correct* is the permutation
+    /// question, which needs the store and is answered there — an empty store
+    /// accepts it and a populated one rejects it. This layer must not turn it
+    /// into `required`, which would report the wrong reason for a store that
+    /// holds no clips.
+    #[test]
+    fn an_empty_order_is_present_and_is_not_required() {
+        assert_eq!(require_order(Some(vec![])), Ok(vec![]));
+    }
+
+    #[test]
+    fn every_element_of_an_order_is_parsed_and_lowercased() {
+        let second = "8a1f0c6e-0000-4000-8000-000000000001";
+        let parsed = require_order(Some(vec![ID.to_uppercase(), second.into()]));
+        match parsed {
+            Ok(ids) => {
+                let spelt: Vec<String> = ids
+                    .iter()
+                    .map(|id| id.as_hyphenated().to_string())
+                    .collect();
+                assert_eq!(spelt, vec![ID.to_string(), second.to_string()]);
+            }
+            Err(e) => panic!("a well-formed order should parse: {e}"),
+        }
+    }
+
+    /// One bad element rejects the whole argument. It is not dropped, and the
+    /// remaining ids are not applied — a subset would be a partial order.
+    #[test]
+    fn a_malformed_element_rejects_the_whole_order() {
+        assert_eq!(
+            require_order(Some(vec![ID.into(), "not-a-uuid".into(), ID.into()])),
+            Err(rejected("order", InvalidReason::MalformedUuid))
+        );
+    }
+
     /// Contract §0: input is parsed case-insensitively, output is lowercase.
     #[test]
     fn a_clip_id_round_trips_to_the_lowercase_hyphenated_form() {
@@ -531,6 +729,7 @@ mod tests {
             draft(json!({ "label": "l", "value": "", "colour": secret })).map(drop),
             draft(json!({ "label": "l\n", "value": secret, "colour": "teal" })).map(drop),
             clip(json!({ "id": secret, "label": "l", "value": "v", "colour": "teal" })).map(drop),
+            require_order(Some(vec![secret.into()])).map(drop),
         ];
         for case in refusals {
             match case {
@@ -586,6 +785,35 @@ mod tests {
         assert_eq!(
             json,
             r#"{"id":"00000000-0000-0000-0000-000000000000","label":"Support greeting","value":"Hello","colour":"amber"}"#
+        );
+    }
+
+    /// Contract §1: four fields, `snake_case`, and a `null` that is a real
+    /// `null` rather than an omitted key — the frontend branches on it.
+    #[test]
+    fn a_lock_state_serialises_to_the_four_declared_fields() {
+        let json = match serde_json::to_string(&LockState::UNENCRYPTED) {
+            Ok(json) => json,
+            Err(e) => panic!("a lock state should serialise: {e}"),
+        };
+        assert_eq!(
+            json,
+            r#"{"encryption_enabled":false,"locked":false,"attempts_remaining":null,"retry_after_ms":null}"#
+        );
+
+        let locked = LockState {
+            encryption_enabled: true,
+            locked: true,
+            attempts_remaining: Some(5),
+            retry_after_ms: None,
+        };
+        let json = match serde_json::to_string(&locked) {
+            Ok(json) => json,
+            Err(e) => panic!("a lock state should serialise: {e}"),
+        };
+        assert_eq!(
+            json,
+            r#"{"encryption_enabled":true,"locked":true,"attempts_remaining":5,"retry_after_ms":null}"#
         );
     }
 

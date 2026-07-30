@@ -5,11 +5,14 @@
   let {
     selected,
     onchange,
-    legend = "Colour",
+    legend,
   }: {
     selected: Colour;
     onchange: (colour: Colour) => void;
-    legend?: string;
+    // No default: the caller's copy-deck constant is the one spelling
+    // (docs/src/product/copy.md CLIP_COLOUR_FIELD_LABEL). A fallback string
+    // here would be a second, silently-agreeing copy of it.
+    legend: string;
   } = $props();
 </script>
 

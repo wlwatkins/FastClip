@@ -23,6 +23,8 @@ writing a new ADR that supersedes it, not editing the old one.
 | [0010](./0010-manual-lock.md) | Locking is manual, and it closes the database | Accepted at G0b, second round |
 | [0011](./0011-flat-backoff.md) | Wrong-PIN backoff is a flat 30 seconds | Accepted; supersedes 0004's backoff consequence |
 | [0012](./0012-logging.md) | A log sink exists, writes to a file, and never contains clip content | Accepted |
+| [0013](./0013-unlock-requested-event.md) | The tray asks the webview to focus the PIN prompt, with an event | Accepted; applies 0008's rule rather than superseding it |
+| [0014](./0014-tray-label-truncation.md) | Tray menu labels are cut at 40 characters | Accepted |
 
 0007 through 0010 are Accepted and **G0b is landed**. The critic returned
 `ACCEPT` on the fourth review of the ratified contract
@@ -46,6 +48,15 @@ document that never held the old decision.
 was Accepted with the rest once the critic had reviewed it. It records why rather
 than what: the `lock` surface itself is ratified in
 [contract §2](../contract.md#lock).
+
+**0013 and 0014 are the first ADRs written from a review finding rather than at a
+gate.** [Review 012](../../reviews/012-wp-08-tray.md) F2 and F3 both found the
+code faithful to the book and the book silent, which is a defect in the
+architect's work. 0013 adds the [`unlock_requested`](../contract.md#unlock_requested)
+event and 0014 ratifies the tray's truncation width. Neither supersedes anything:
+0013 **applies** 0008's "the traffic follows the consumer" rule to a case where
+the consumer is on the other side, and says so rather than leaving a reader to
+find a contradiction.
 
 ## Template
 

@@ -14,6 +14,14 @@ The log is append-only. Superseding a review means writing a new one.
 | [003](./003-wp-01-contract.md) | WP-01 Contract ratification (G0b) | `ACCEPT` | 4 (1 major, 3 minor) | 0 — all 4 carried to WP-03 and WP-07 |
 | [004](./004-wp-10-palette.md) | WP-10 Palette and accessibility (G3) | `ACCEPT` | 4 (1 major, 3 minor) | 0 — all four fixed |
 | [005](./005-wp-05-crud.md) | WP-05 Clip list, copy, CRUD (G3) | `REWORK_ARCHITECTURE` → resolved | 5 (1 major, 4 minor) | 0 — all five fixed; ADR-0012 written |
+| [006](./006-wp-14-settings.md) | WP-14 Settings, lock state, startup (G3) | `REWORK_IMPLEMENTATION` → resolved | 1 minor | 0 — fixed |
+| [007](./007-wp-06-reorder.md) | WP-06 Reordering (G3) | `ACCEPT` | 1 minor | 0 — fixed |
+| [008](./008-wp-09-export-import.md) | WP-09 Export and import (G3) | `ACCEPT` | 2 (1 major, 1 minor) | 0 — F1 discharged by re-measurement, F2 to `architect` |
+| [009](./009-wp-13-search.md) | WP-13 Search and filter (G3) | `REWORK_TESTS` → resolved | 1 major | 0 — fixed |
+| [010](./010-wp-07-encryption.md) | WP-07 Optional PIN-gated encryption (G3) | `ACCEPT` on the second pass | 1 minor + 1 first-pass major, fixed | 0 — F1 to `test-engineer` as a follow-up |
+| [011](./011-wp-11-copy-deck.md) | WP-11 Copy deck and README (G3) | `REWORK_IMPLEMENTATION` | 4 (3 major, 1 minor) | 0 — F1–F3 to `frontend-dev`, F4 to the owner |
+| [012](./012-wp-08-tray.md) | WP-08 Tray icon (G3) | `REWORK_ARCHITECTURE` | 3 (1 major, 2 minor) | 0 — F1 fixed by `devops`; F2 and F3 answered by ADR-0013 and ADR-0014 |
+| [013](./013-wp-08-rework.md) | WP-08 rework: the `unlock_requested` event (G3) | `REWORK_ARCHITECTURE` | 2 (1 major, 1 minor) | 0 — both closed |
 
 ## Verdicts
 

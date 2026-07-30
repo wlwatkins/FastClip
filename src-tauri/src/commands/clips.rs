@@ -1,10 +1,11 @@
-//! The five clip commands of WP-05: list, create, update, delete, copy.
+//! The five clip commands of WP-05 — list, create, update, delete, copy — and
+//! WP-06's `reorder_clips`.
 //!
 //! `docs/src/architecture/contract.md` §2 is authoritative for every command
 //! name, argument name, return shape, error variant and event. Where this file
 //! and that page disagree, this file is the defect.
 //!
-//! Three rules govern all five.
+//! Three rules govern all six.
 //!
 //! **Lock state is checked in one place.** Every command here is "works while
 //! locked: no", and none of them checks lock state itself: they run their work
@@ -21,6 +22,19 @@
 //! **Nothing here logs a clip.** The arguments hold a `label` and a `value`, and
 //! `println!` printing clip values is one of the defects this refactor exists to
 //! remove.
+//!
+//! **The tray is rebuilt beside the event** (WP-08, spec §4.5). Every command
+//! that emits `update_clips` changes the clip list, and `copy_clip` changes a
+//! `use_count`; those are the two triggers spec §4.5 names, and
+//! [`crate::tray::refresh`] is called for both after the mutation has committed.
+//! It is a separate call rather than something hidden inside
+//! [`events::emit_update_clips`], because the tray is not an event and a reader
+//! looking for what happens after a mutation should find both lines.
+//!
+//! Nothing enforces that set by construction, so `tests/ipc.rs` enumerates all
+//! sixteen contract §2 commands and asserts, per command, whether a call
+//! rebuilds the menu. Adding a command to `lib.rs` fails that table until the
+//! question is answered for it.
 
 use tauri::{AppHandle, Runtime, State};
 use uuid::Uuid;
@@ -30,12 +44,14 @@ use crate::commands::events;
 use crate::commands::wire::{self, Clip, ClipPayload};
 use crate::error::ClipError;
 use crate::storage::{clips, Store};
+use crate::tray;
 
 /// The complete list, in display order, as the wire sees it.
 ///
 /// One function so that `list_clips` and every `update_clips` payload are the
-/// same query. A second spelling of "the list" is how the two drift.
-fn snapshot(connection: &rusqlite::Connection) -> Result<Vec<Clip>, ClipError> {
+/// same query — including `unlock`'s, which emits the list the moment the store
+/// opens. A second spelling of "the list" is how the two drift.
+pub(crate) fn snapshot(connection: &rusqlite::Connection) -> Result<Vec<Clip>, ClipError> {
     Ok(clips::list(connection)?
         .into_iter()
         .map(Clip::from)
@@ -71,6 +87,7 @@ pub fn create_clip<R: Runtime>(
     })?;
 
     events::emit_update_clips(&app, &listed);
+    tray::refresh(&app);
     Ok(())
 }
 
@@ -99,6 +116,7 @@ pub fn update_clip<R: Runtime>(
     })?;
 
     events::emit_update_clips(&app, &listed);
+    tray::refresh(&app);
     Ok(())
 }
 
@@ -120,6 +138,41 @@ pub fn delete_clip<R: Runtime>(
     })?;
 
     events::emit_update_clips(&app, &listed);
+    tray::refresh(&app);
+    Ok(())
+}
+
+/// Apply a complete permutation of the stored id set (WP-06, ADR-0007).
+///
+/// `order` is every clip id in the new display order. It is not a delta and not
+/// a move: a full permutation is the only form the backend can check against the
+/// set it holds, which is what lets a stale client — one that computed a drag
+/// against a list from before another clip was created — be rejected whole
+/// rather than half-applied.
+///
+/// Anything that is not an exact permutation is
+/// `invalid_input { field: "order", reason: "not_a_permutation" }`, and **never**
+/// `not_found`: an id that is not in the store makes the whole argument wrong,
+/// not one element of it. The frontend's recovery is to discard the drag and
+/// render the most recent `update_clips`, not to retry.
+///
+/// The whole rewrite is one transaction, so a process killed at any instant
+/// leaves the old order or the new one, dense either way.
+#[tauri::command(rename_all = "snake_case")]
+pub fn reorder_clips<R: Runtime>(
+    app: AppHandle<R>,
+    store: State<'_, Store>,
+    order: Option<Vec<String>>,
+) -> Result<(), ClipError> {
+    let order = wire::require_order(order)?;
+
+    let listed = store.with_unlocked_store(|open| {
+        clips::reorder(open, &order)?;
+        snapshot(open)
+    })?;
+
+    events::emit_update_clips(&app, &listed);
+    tray::refresh(&app);
     Ok(())
 }
 
@@ -130,8 +183,36 @@ pub fn delete_clip<R: Runtime>(
 /// implementation.
 ///
 /// Emits **nothing**: a copy changes only `use_count`, which nothing on the
-/// frontend displays or orders by, and an event per click would rebuild the tray
-/// menu on the hottest path in the application (ADR-0008).
+/// frontend displays or orders by, so there is no list for an event to carry
+/// (ADR-0008).
+///
+/// **The native tray still rebuilds**, because a `use_count` changed and spec
+/// §4.5 ranks the menu by it. That happens inside the backend and never touches
+/// the webview, which is the distinction ADR-0008 draws — the cost it rejected
+/// was an IPC event and a frontend re-render per click, not this.
+///
+/// **The rebuild follows the copy whether it succeeded or not**, which is what
+/// [`crate::tray`]'s own caller of [`copy`] already does and is the *only*
+/// mutating command here that rebuilds after a failure. The two callers of
+/// [`copy`] used to disagree about this, and the tray was the one that was
+/// right:
+///
+/// - `locked` means the menu is showing clip labels over a locked store, which
+///   is [criterion 10](../../../docs/src/product/spec.md) breached in the one
+///   surface the contract says breaches it exactly as the window would. A
+///   rebuild corrects it and staleness does not.
+/// - `not_found` means the menu is offering a clip that is gone.
+/// - `clipboard` changed nothing, and the rebuild is wasted work on a path that
+///   is already failing — not on the success path spec §4.1 measures.
+///
+/// This is defence in depth rather than the only guard: `lock` rebuilds when it
+/// locks and `delete_clip` rebuilds when it deletes, so reaching either state
+/// with a stale menu already means an earlier rebuild was lost. It costs one
+/// menu rebuild on a call that failed.
+///
+/// **A rejected *argument* does not rebuild.** `require_clip_id` fails before
+/// the store is consulted, so nothing about the store — or about what the menu
+/// should show — has been learned.
 #[tauri::command(rename_all = "snake_case")]
 pub fn copy_clip<R: Runtime>(
     app: AppHandle<R>,
@@ -139,7 +220,9 @@ pub fn copy_clip<R: Runtime>(
     clip_id: Option<String>,
 ) -> Result<(), ClipError> {
     let id = wire::require_clip_id(clip_id)?;
-    copy(&store, &AppClipboard(&app), id)
+    let outcome = copy(&store, &AppClipboard(&app), id);
+    tray::refresh(&app);
+    outcome
 }
 
 /// The single clipboard write, for the window and the tray alike (spec §4.5).
@@ -298,6 +381,117 @@ mod tests {
 
         let reopened = Store::open(paths);
         assert_eq!(use_count(&reopened, id), 1);
+    }
+
+    // ---- reorder (WP-06) ----
+
+    /// The store call the command makes, without the `AppHandle` a
+    /// `#[tauri::command]` needs. `reorder_clips` is `require_order`, this, and
+    /// the emit.
+    fn reorder(store: &Store, order: &[Uuid]) -> Result<Vec<Clip>, ClipError> {
+        store.with_unlocked_store(|open| {
+            clips::reorder(open, order)?;
+            snapshot(open)
+        })
+    }
+
+    fn listed_ids(store: &Store) -> Vec<Uuid> {
+        match store.with_unlocked_store(|open| snapshot(open)) {
+            Ok(listed) => listed.iter().map(|clip| clip.id).collect(),
+            Err(e) => panic!("the list should succeed: {e}"),
+        }
+    }
+
+    /// The `update_clips` payload is the same query `list_clips` answers with,
+    /// taken inside the guard that made the mutation — so the event carries the
+    /// new order and cannot describe a store a later command has changed.
+    #[test]
+    fn a_reorder_emits_the_new_order_and_it_is_what_list_clips_returns() {
+        let parent = dir();
+        let store = store_in(&parent);
+        let ids: Vec<Uuid> = (0..4)
+            .map(|n| add(&store, &format!("clip {n}"), "a value"))
+            .collect();
+
+        let moved = vec![ids[2], ids[3], ids[0], ids[1]];
+        let payload = match reorder(&store, &moved) {
+            Ok(payload) => payload,
+            Err(e) => panic!("the reorder should succeed: {e}"),
+        };
+
+        let emitted: Vec<Uuid> = payload.iter().map(|clip| clip.id).collect();
+        assert_eq!(emitted, moved);
+        assert_eq!(listed_ids(&store), moved);
+    }
+
+    /// Definition of done: the order the user set is the order after restart.
+    /// Leaking the connection without closing it is the closest a unit test gets
+    /// to a kill — nothing is checkpointed and no destructor runs, so the
+    /// rewritten positions exist only in the write-ahead log when the store is
+    /// reopened (ADR-0009, `synchronous = NORMAL`).
+    #[test]
+    fn a_reorder_survives_a_process_kill_immediately_after_it() {
+        let parent = dir();
+        let paths = StorePaths::at(parent.path().join(".fast-clip"));
+        let expected = {
+            let store = Store::open(paths.clone());
+            let ids: Vec<Uuid> = (0..5)
+                .map(|n| add(&store, &format!("clip {n}"), "a value"))
+                .collect();
+            let reversed: Vec<Uuid> = ids.iter().rev().copied().collect();
+            if let Err(e) = reorder(&store, &reversed) {
+                panic!("the reorder should succeed: {e}");
+            }
+            // No `shutdown()`, no checkpoint, no close.
+            std::mem::forget(store);
+            reversed
+        };
+
+        let reopened = Store::open(paths);
+        assert_eq!(listed_ids(&reopened), expected);
+    }
+
+    /// A rejected reorder changes nothing, so the frontend's recovery — render
+    /// the last `update_clips` it received — is correct. If any row had moved,
+    /// that payload would be stale and the user would see the wrong order with
+    /// no event coming to fix it.
+    #[test]
+    fn a_rejected_reorder_leaves_the_stored_order_exactly_as_it_was() {
+        let parent = dir();
+        let store = store_in(&parent);
+        let ids: Vec<Uuid> = (0..3)
+            .map(|n| add(&store, &format!("clip {n}"), "a value"))
+            .collect();
+
+        let stale = vec![ids[2], ids[0], Uuid::new_v4()];
+        assert_eq!(
+            reorder(&store, &stale).map(drop),
+            Err(ClipError::InvalidInput {
+                field: "order".into(),
+                reason: crate::error::InvalidReason::NotAPermutation,
+            })
+        );
+        assert_eq!(listed_ids(&store), ids);
+    }
+
+    /// `reorder_clips` is "works while locked: no", and the shared guard is the
+    /// only place that decides it.
+    #[test]
+    fn a_locked_store_refuses_a_reorder() {
+        let parent = dir();
+        let paths = StorePaths::at(parent.path().join(".fast-clip"));
+        if let Err(e) = std::fs::create_dir_all(paths.dir()) {
+            panic!("could not create the fixture directory: {e}");
+        }
+        if let Err(e) = std::fs::write(paths.db(), [0x1f; 64]) {
+            panic!("could not write the fixture: {e}");
+        }
+
+        let store = Store::open(paths);
+        assert_eq!(
+            reorder(&store, &[Uuid::new_v4()]).map(drop),
+            Err(ClipError::Locked)
+        );
     }
 
     /// The guard is the only lock check, so a locked store refuses the copy

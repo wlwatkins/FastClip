@@ -6,12 +6,29 @@
 // `@tauri-apps/api/event`, exactly as the app calls them.
 //
 // Event delivery uses the same mechanism the real Tauri IPC uses: `listen()`
-// registers a callback via `transformCallback`, which `mocks.js` exposes as
-// `window["_" + id]`. `emit()` below calls that function directly, which is
-// the same thing the real Tauri core does when the backend emits — nothing
-// here is a shortcut around the frontend's own event wiring.
+// registers a callback via `transformCallback`, which `mocks.cjs` (as of
+// @tauri-apps/api 2.11.1) stores in an internal `Map` keyed by the id and
+// exposes only through `window.__TAURI_INTERNALS__.runCallback(id, data)` —
+// there is no `window["_" + id]` global to call directly any more. `emit()`
+// below calls `runCallback` with the same `{ event, id, payload }` shape the
+// real Tauri core delivers, which is what `mocks.cjs`'s own `runCallback`
+// passes straight through to the registered callback.
 
 import { mockIPC, mockWindows, clearMocks } from "@tauri-apps/api/mocks";
+
+// `@tauri-apps/api` does not publish a type for `window.__TAURI_INTERNALS__`
+// (see mocks.d.ts, which documents the mock functions but not the global
+// they patch). This is the minimal shape this file relies on, confirmed
+// against the installed `node_modules/@tauri-apps/api/mocks.cjs`.
+interface TauriInternalsForEmit {
+  runCallback: (id: number, data: { event: string; id: number; payload: unknown }) => void;
+}
+
+declare global {
+  interface Window {
+    __TAURI_INTERNALS__: TauriInternalsForEmit;
+  }
+}
 
 export type InvokeCall = { cmd: string; args: Record<string, unknown> | undefined };
 
@@ -53,8 +70,7 @@ export function setupTauriMock(handlers: CommandHandlers): {
     if (handlerId === undefined) {
       throw new Error(`mockTauri: no listener registered for event "${eventName}"`);
     }
-    const target = window as unknown as Record<string, (e: unknown) => void>;
-    target[`_${handlerId}`]({ event: eventName, id: 0, payload });
+    window.__TAURI_INTERNALS__.runCallback(handlerId, { event: eventName, id: 0, payload });
   }
 
   return { calls, emit };

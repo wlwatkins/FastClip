@@ -1,4 +1,7 @@
 <script lang="ts">
+  import { overlayDismiss } from "../actions/overlayDismiss";
+  import { CANCEL_BUTTON_LABEL } from "../copy";
+
   let {
     title,
     message,
@@ -33,30 +36,14 @@
     }
   }
 
-  // Same drag-out-of-dialog guard as ClipForm.svelte: a `click` synthesised
-  // from a `mousedown` inside the dialog and a `mouseup` over the overlay
-  // targets the overlay either way, so both ends of the gesture must land on
-  // the overlay before it counts as a dismiss.
-  let overlayMouseDown = false;
 
-  function handleOverlayMouseDown(event: MouseEvent) {
-    overlayMouseDown = event.target === event.currentTarget;
-  }
-
-  function handleOverlayClick(event: MouseEvent) {
-    if (overlayMouseDown && event.target === event.currentTarget) {
-      oncancel();
-    }
-    overlayMouseDown = false;
-  }
 </script>
 
-<!-- The overlay is a mouse-only dismiss convenience; see ClipForm.svelte for the same pattern. -->
+<!-- The overlay is a mouse-only dismiss convenience; see overlayDismiss.ts for the drag-out-of-dialog guard. -->
 <div
   role="presentation"
   class="fixed inset-0 z-30 flex items-center justify-center bg-black/50"
-  onmousedown={handleOverlayMouseDown}
-  onclick={handleOverlayClick}
+  use:overlayDismiss={oncancel}
 >
   <div
     role="alertdialog"
@@ -77,7 +64,7 @@
         class="rounded px-3 py-1.5 text-sm text-zinc-300 hover:bg-zinc-700 hover:text-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400"
         onclick={oncancel}
       >
-        Cancel
+        {CANCEL_BUTTON_LABEL}
       </button>
       <button
         type="button"

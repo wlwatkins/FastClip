@@ -1,7 +1,9 @@
 # IPC contract
 
 **Status:** Ratified at G0b, amended in the second round after the owner
-answered the escalations. No open questions remain.
+answered the escalations, and amended again after
+[review 012](../reviews/012-wp-08-tray.md) added the
+[`unlock_requested`](#unlock_requested) event. No open questions remain.
 **Owner:** `architect`. Nobody else edits this page.
 
 The only agreed interface between the Svelte frontend and the Rust backend.
@@ -281,8 +283,12 @@ down locally from receipt and re-enables the PIN input at zero. The backend
 re-checks on the next `unlock` call and is authoritative: a frontend whose clock
 runs fast gets `backoff` again.
 
-The failed-attempt count and the backoff deadline are persisted
-([storage](./storage.md)), so restarting FastClip does not clear them.
+The failed-attempt count and the backoff deadline are persisted in `keyfile`, so
+restarting FastClip does not clear them. **Persisting them is a write to the file
+holding the only copy of the wrapped DEK**, and it is atomic like every other
+write to it
+([storage](./storage.md#every-write-to-keyfile-is-atomic-every-one)) — otherwise
+a mistyped PIN could destroy the store it is protecting.
 
 ### `Settings`
 
@@ -323,7 +329,7 @@ else ([below](#versions-on-disk)).
 | Field | Rule |
 | ----- | ---- |
 | `format` | Exactly `"fastclip-export"`. Anything else is `import { reason: "malformed_json" }`. |
-| `version` | Integer. This build writes and accepts `1`. A higher value is `import { reason: "unsupported_version" }`. |
+| `version` | Integer. This build writes and accepts `1`. A **higher** value is `import { reason: "unsupported_version" }`. A **lower** value, or a non-integer, is `import { reason: "malformed_json" }` ([below](#a-version-below-1-is-not-a-version-problem)). |
 | `clips` | Array. May be empty, which imports nothing and succeeds. |
 | `clips[].id` | **Written on export, ignored on import.** Import mints a fresh id for every clip ([spec §4.6](../product/spec.md#46-export-and-import-json)), so two clips in one file carrying the same id produce two distinct clips. It may be absent. |
 | `clips[].label`, `value`, `colour` | Required, validated exactly as in [§1](#1-data-types). |
@@ -331,6 +337,37 @@ else ([below](#versions-on-disk)).
 
 Any other field on a clip, or at the top level, is
 `import { reason: "unknown_field", field, index }`.
+
+#### A version below 1 is not a version problem
+
+Only a **higher** `version` gets `unsupported_version`, because only a higher
+value can have been written by a FastClip. No build ever wrote `0`, a negative
+number, or `"1"` as a string, so a file carrying one is not an export from
+another version of this application — it is a file that is not a FastClip export
+at all, which is what `format` already covers.
+
+The sentences the user reads are what decide this:
+
+| Reason | The [copy deck](../product/copy.md) sentence | True of `version: 0`? |
+| ------ | ------------------------------------------- | --------------------- |
+| `unsupported_version` | "This export file is from a newer version of FastClip." | **No.** It sends the user looking for an upgrade that does not exist. |
+| `malformed_json` | "This is not a FastClip export file." | **Yes.** |
+
+`malformed_json` already means exactly that: a wrong `format` string produces it
+on a file that is perfectly well-formed JSON. `format` and `version` are both
+header fields that identify the format, so a `version` no build ever wrote is the
+same kind of wrongness as a `format` no build ever wrote, and gets the same
+answer.
+
+Rejected: a new `ImportReason` such as `unrecognised_version`. It needs a new
+copy-deck sentence for a case reachable only by a hand-edited or corrupted file,
+and `malformed_json`'s existing sentence is already the true one.
+
+**When version 2 exists this rule does not change.** A version-1 file will then
+be *below* the current version and must still be read — that is what
+[migrate-don't-reject](#versions-on-disk) means. The boundary is not "below the
+current version", it is **below the lowest version this build knows how to
+read**, which is 1 today and stays 1 unless a format is ever withdrawn.
 
 ### Versions on disk
 
@@ -371,7 +408,10 @@ database and reads `user_version` before any command is served, and both failure
 reach the frontend from `get_lock_state`
 ([opening the database](#opening-the-database)).
 
-A version **lower** than the current one is migrated, not rejected. There is
+A version **lower** than the current one, but not below the lowest this build
+can read, is migrated rather than rejected. Below that floor the format never
+existed and the artefact is rejected as malformed — for the export file, see
+[above](#a-version-below-1-is-not-a-version-problem). There is
 nothing to migrate at version 1; the mechanism exists from the first release so
 that there is one when there is
 ([ADR-0005](./adr/0005-sqlite-store.md)). This is unrelated to
@@ -403,13 +443,29 @@ under exactly the names below.
 | [`set_always_on_top`](#set_always_on_top) | `enabled: boolean` | `null` | yes | — | yes |
 
 "Works while locked: no" means the command returns `locked` whenever
-`LockState.locked` is true, before doing anything else
+`LockState.locked` is true, **before touching the store**
 ([spec §4.8](../product/spec.md#48-encryption-and-unlocking)). The frontend
 handles `locked` on **every** such call, not only at launch — see
 [§4](#when-locked-is-reachable).
 
-Each such command checks lock state **twice**: on entry, and again after it
-acquires the store's connection lock. The second check is what makes a
+**Argument-shape validation may precede the lock check, and does.** An absent or
+malformed argument is `invalid_input` even on a locked store: `reorder_clips`
+with no `order` key returns `invalid_input { field: "order", reason: "required" }`
+rather than `locked`. That discloses nothing — the answer is derived from the
+payload alone and would be identical against any store, locked, unlocked or
+absent.
+
+What the rule protects is the comparison of an argument against **stored
+content**. `reorder_clips` decides the lock before it compares `order` against
+the stored id set, so a locked store never reveals its membership; the observable
+case is `{"order": []}`, which is an exact permutation of an empty store and
+therefore returns `locked` rather than success. An earlier wording said "before
+doing anything else", which read as forbidding the argument validation every
+command correctly performs first.
+
+Each such command checks lock state **twice**: once before it touches the store,
+after its arguments have been validated, and again after it acquires the store's
+connection lock. The second check is what makes a
 concurrent [`lock`](#lock) produce `locked` rather than a torn write or an
 `internal` ([storage](./storage.md#locking-on-demand)). It belongs in one shared
 guard, not in the ten command bodies marked "no".
@@ -479,7 +535,8 @@ the store is known good.
 Startup recovery does not fail the launch. It **records** the fault and leaves
 the store with no connection ([storage](./storage.md#startup-recovery)), so that
 there is a window in which to show a message. Every command that needs the store
-then passes the same guard, in this order:
+then passes the same guard, in this order — after its arguments have been
+validated, which precedes all three ([§2](#2-commands)):
 
 1. Is the store locked? → `locked`.
 2. Is there a recorded fault? → **return it verbatim.**
@@ -649,7 +706,10 @@ await invoke("copy_clip", { clip_id: "…" });
 | Emits | **nothing** ([ADR-0008](./adr/0008-use-count-stays-backend-side.md)) |
 | Errors | `invalid_input` (`required`, `malformed_uuid`), `not_found`, `clipboard`, `locked`, `crypto` (`corrupt`), `unsupported_version` (`schema`), `storage` |
 
-**Order of operations, in this order, before the command returns:**
+**Order of operations, in this order, before the command returns.** The list
+begins once the command has reached the store — argument validation and the lock
+check precede step 1, as they do for every command marked "works while locked:
+no" ([§2](#2-commands)). A locked store is never looked up in.
 
 1. Look up the clip. Unknown id → `not_found`, nothing else happens.
 2. Write `value` to the clipboard. Failure → `clipboard`, and `use_count` is not
@@ -695,6 +755,23 @@ members, no duplicates. Anything else is
 **never** returns `not_found`; an id that is not in the store makes the whole
 argument wrong, not one element of it.
 
+Two consequences that follow from that sentence and are written out because both
+were asked:
+
+- **`field` is always `"order"`, never an index.** `invalid_input` carries a
+  `field` and a `reason` and nothing else, and `field` names the **wire field**
+  ([§0](#0-wire-rules)) — `order` is the argument, and `order[]` in
+  [the validation table](#validation-rules-stated-once) is a rule about its
+  elements rather than a second field name. A malformed element is
+  `invalid_input { field: "order", reason: "malformed_uuid" }`, with no way to
+  say which element, and that is the only compliant answer rather than a gap.
+  The frontend built that array from ids the backend gave it, so a malformed
+  element is a frontend defect and not something a user can act on.
+- **An empty array is not `required`.** `required` is defined for an *absent*
+  key ([argument deserialisation](#the-argument-itself--every-command)), and `[]`
+  is present. Against an empty store it is an exact permutation and succeeds;
+  against a populated one it fails on length as `not_a_permutation`.
+
 On `not_a_permutation` the frontend discards the drag and renders the most
 recent `update_clips` payload. It does not retry with the same order. This is
 the expected outcome when a clip was created or deleted between the frontend's
@@ -708,10 +785,28 @@ const { exported } = await invoke("export_clips", { path: "C:\\…\\clips.json" 
 
 | | |
 | --- | --- |
-| Arguments | `path: string` — an absolute path to a `.json` file |
+| Arguments | `path: string` — non-empty. The frontend supplies an absolute path to a `.json` file ([below](#what-the-backend-checks-about-path)). |
 | Returns | `ExportResult` — `{ exported: number }` |
 | Mutates | no |
 | Errors | `invalid_input` (`required`), `io`, `locked`, `crypto` (`corrupt`), `unsupported_version` (`schema`), `storage` |
+
+#### What the backend checks about `path`
+
+**Only that it is non-empty**, which is what
+[the validation table](#validation-rules-stated-once) says and what the backend
+implements. "Absolute" and "`.json`" describe what the frontend sends; they are
+**not** validations, and the backend performs neither.
+
+That is a decision rather than an omission. A `not_absolute` reason would put a
+new `InvalidReason` on the wire, needing a copy-deck sentence, for a condition
+only a frontend defect can produce — the path comes from the operating system's
+file dialog, which returns absolute paths. An extension check would be worse: it
+would reject a path the user deliberately chose.
+
+A relative path arriving anyway is resolved by the operating system against the
+process's working directory. It is not modelled, for the same reason a wrongly
+typed argument is not ([§1](#the-argument-itself--every-command)): it is only
+reachable by a frontend that bypassed its own file dialog.
 
 The **frontend** opens the file dialog and passes the chosen absolute path. The
 backend never opens a dialog: putting UI sequencing in the backend would make
@@ -721,7 +816,18 @@ state and produces no `invoke` and no error variant.
 The file is written whole and atomically: to `<path>.part` in the target
 directory, then renamed onto `path`. **`<path>.part` is deleted on every failure
 path, including a failed rename**, so neither a partial nor a complete plaintext
-file is ever left under a name the user did not choose. The temporary file
+file is ever left under a name the user did not choose.
+
+**Every handle on `<path>.part` is closed before it is renamed or deleted.**
+Windows refuses both operations while a handle is open, so a failure path that
+deletes before closing does not delete: it leaves **a complete plaintext copy of
+every clip** in a directory the user chose, under a name they did not. That
+residue is worse than the conversion equivalent, because it is plaintext by
+design and lives outside `~/.fast-clip/`, where
+[startup recovery](./storage.md#startup-recovery) can never collect it — as the
+paragraph below already says of the kill case. The write handle and the read-back
+handle are both closed; the read-back opens the file a second time and closing it
+is part of that step, not an afterthought. The temporary file
 carries clip values, so this is a disclosure rule and not tidiness
 ([acceptance criterion 6](../product/spec.md#8-acceptance-criteria)).
 
@@ -756,7 +862,7 @@ const { imported } = await invoke("import_clips", { path: "C:\\…\\clips.json" 
 
 | | |
 | --- | --- |
-| Arguments | `path: string` — an absolute path to a `.json` file |
+| Arguments | `path: string` — non-empty. The frontend supplies an absolute path to a `.json` file ([below](#what-the-backend-checks-about-path)). |
 | Returns | `ImportResult` — `{ imported: number }` |
 | Mutates | yes |
 | Emits | `update_clips`, only on success |
@@ -1121,8 +1227,11 @@ unlike `disable_encryption`, which must read the encrypted store to write a
 plaintext one.
 
 The old PIN stops working the moment this returns. If the process is killed
-mid-change, the key material is either fully re-wrapped or untouched — it is
-written to a temporary file and renamed.
+mid-change, the key material is either fully re-wrapped or untouched, because
+**every** write to `keyfile` goes to a temporary file and is renamed
+([storage](./storage.md#every-write-to-keyfile-is-atomic-every-one)) — a rule on
+the file rather than on this command, so no writer of it can be the one that
+forgot.
 
 ### `get_settings`
 
@@ -1194,8 +1303,14 @@ invent one.
 
 ## 3. Events
 
-Both events are emitted with `AppHandle::emit`, so every listening window
+**Three.** All are emitted with `AppHandle::emit`, so every listening window
 receives them. There is one window.
+
+| Event | Payload | Emitted by |
+| ----- | ------- | ---------- |
+| [`update_clips`](#update_clips) | `Clip[]`, complete | six commands |
+| [`lock_state`](#lock_state) | `LockState`, complete | four commands |
+| [`unlock_requested`](#unlock_requested) | `null` | **no command** — the tray's *Unlock FastClip* item |
 
 **No emit may be silently dropped.** The pre-refactor build populates a global
 `APP_HANDLE` inside a task spawned from `setup()`, so an early `invoke` finds
@@ -1205,7 +1320,7 @@ any command can be invoked. This is a contract guarantee — the frontend is
 entitled to assume an event follows every mutation — and not merely a tidiness
 fix.
 
-The frontend registers both listeners **before its first `invoke`**.
+The frontend registers all three listeners **before its first `invoke`**.
 
 ### `update_clips`
 
@@ -1278,6 +1393,79 @@ consequences, and both are the reason the trigger says "on disk":
 that a failed command did not change. It does not hold for `lock_state`, and the
 difference is that a conversion's failure can come *after* the state changed.
 
+### `unlock_requested`
+
+| | |
+| --- | --- |
+| Payload | `null`. **Complete, vacuously** — there is no state in it. It reports a gesture, not a fact about the store, and every fact the handler needs is already in the last [`lock_state`](#lock_state). |
+| Trigger | The user chose the tray's *Unlock FastClip* item. Emitted once per choice, after the backend's raise sequence — unminimise, show, focus — has run. |
+| Not emitted by | **any command.** It is the only event on this page with no command behind it. Not by [`lock`](#lock): locking is not a request to unlock. Not by a clip mutation, the window's own controls, or any automatic transition. |
+| Consumed by | the PIN prompt |
+
+**Why it exists.** [Spec §4.8](../product/spec.md#48-encryption-and-unlocking)
+requires the tray item to raise the window "with the PIN prompt focused".
+Raising is a window operation and the backend does it; focusing an input is a
+DOM operation and only the webview can do it. Without a signal the two halves
+of that one sentence are owned by two processes and one of them never hears
+about it. Governed by
+[ADR-0013](./adr/0013-unlock-requested-event.md).
+
+**It does not contradict
+[ADR-0008](./adr/0008-use-count-stays-backend-side.md).** That ADR keeps a tray
+*copy* off the IPC seam because `use_count` has no frontend consumer. This event
+has a consumer the backend cannot be: the PIN input lives in the webview. The
+rule in both cases is the same — the traffic follows the consumer.
+
+**The backend emits unconditionally when the item is chosen**, without
+re-checking lock state first. The item is only ever built into a locked menu, and
+the frontend gates on its own state anyway — an event is asynchronous, so a
+second check on the sending side removes nothing from the receiving side and
+gives one decision two owners.
+
+**The frontend acts on it only while its last received `lock_state` says
+`locked: true`,** and discards it otherwise. This is the discard rule
+[`update_clips`](#update_clips) already carries, for the same race: the tray is
+rebuilt on every lock-state change, so an *Unlock FastClip* item clicked over a
+store that has since unlocked means a rebuild lost a race, and the event behind
+it must not pull focus out of a window the user is working in.
+
+**Before any lock state has been received there is none, so the event is
+discarded.** The [startup sequence](#startup-sequence) registers this listener at
+step 1 and learns the lock state at step 3, so an event arriving in between finds
+no `locked: true` and is dropped. It is **not** buffered for replay. Two readings
+of the sentence above were available and they produce different code, so the
+answer is written here rather than left to whoever implements it first:
+
+| Reading | Rejected because |
+| ------- | ---------------- |
+| Buffer the event and replay it once `get_lock_state` returns | It adds a queue and an ordering rule to a gesture that has already happened, and the gesture is a convenience: a missed one costs a click, as the failed-emission rule below already establishes. |
+| Treat an unknown lock state as permission to act | It would pull focus into a PIN field over a store that turns out to be unlocked, which is the case the gate exists to prevent. |
+
+Discarding costs nothing observable. A store that launches locked reaches step 5
+and mounts the PIN prompt, which takes focus on mount — so the user who clicked
+*Unlock FastClip* during startup gets a focused field regardless, by a different
+route. **That coincidence is not the reason for the rule and must not be relied
+on**: if the prompt ever stops focusing at mount, this event still does nothing
+before step 3, by design.
+
+**What the frontend then does is
+[spec §4.8](../product/spec.md#48-encryption-and-unlocking)'s, not this page's.**
+That page says what the user sees; this page fixes the wire. The two rules above
+are the whole of the wire contract, and no command name, argument, payload field,
+error variant or event on this page varies with the answer §4.8 gives.
+
+**Focus must survive the raise, and one `.focus()` call may not be enough.** The
+window is being unminimised and brought forward at the moment the event lands, and
+a webview that restores focus to the element which held it before the minimise
+would undo a focus set too early. The requirement is the outcome — **the PIN
+input holds keyboard focus once the window has settled** — and the mechanism is
+`frontend-dev`'s to choose.
+
+**A failed emission fails nothing.** The window is still raised and the prompt is
+still on screen; the user clicks the field. No state is wrong and nothing is
+retried. Logged at error level ([ADR-0012](./adr/0012-logging.md)), on the same
+reasoning as [`update_clips`](#update_clips).
+
 ### Startup sequence
 
 Defined here because two plausible sequences exist, and implementing one on each
@@ -1288,7 +1476,15 @@ the variant, plus the recovery path, and no clip list. Every branch that reaches
 it stops there. It is reached from three places and looks the same in all three,
 so the frontend implements it once.
 
-1. Register listeners for `update_clips` and `lock_state`.
+1. Register listeners for `update_clips`, `lock_state` and `unlock_requested`.
+   All three here, so there is one registration point rather than three timings,
+   and so no emit is dropped ([§3](#3-events)).
+   [`unlock_requested`](#unlock_requested) can arrive during the sequence,
+   because a store that launches locked has a tray showing the *Unlock FastClip*
+   item from the moment the tray is installed. **One that arrives before step 3
+   is discarded**, because no lock state has been received yet and the event's
+   gate is that state ([`unlock_requested`](#unlock_requested)). It is not
+   buffered.
 2. `get_settings`.
    - Rejects with `storage` → use `{ always_on_top: false }` and continue to
      step 3, which reports the fault ([`get_settings`](#get_settings)).
@@ -1382,15 +1578,37 @@ The frontend maps **every** variant to a sentence from the
 | `invalid_input` | An argument failed validation. `field` names the wire field. | The inline validation message for that field. |
 | `storage` | The store could not be read or written, created, or its directory reached — including a `clips.db` that is present but whose header cannot be read at all ([storage](./storage.md#classifying-clipsdb)). | The store could not be read or written. **Not** "disk write failed": this variant covers reads, and the commonest read failure is a file another process is holding, where nothing is damaged and no recovery is needed. |
 | `io` | A **user-chosen** file — an export target or an import source — could not be read or written. Never the store. | The export or import could not reach the file. |
-| `crypto` | `bad_key_material`: the key material is missing, unreadable, or was created by another Windows account or machine. `corrupt`: the database will not open or fails its integrity check — with encryption on, after the key unwrapped successfully; with encryption off, on its own. | Account-bound store, or an unopenable store. Both point at [import](../product/spec.md#46-export-and-import-json) as the recovery path. |
+| `crypto` | `bad_key_material`: the key material is missing, unreadable, was created by another Windows account or machine, or carries a version byte no build wrote. `corrupt`: the database will not open, fails its integrity check, or is a SQLite file that is not a FastClip store at all ([storage](./storage.md#version-0-and-why-creation-is-transactional)) — with encryption on, after the key unwrapped successfully; with encryption off, on its own. | Account-bound store, or an unopenable store. Both point at [import](../product/spec.md#46-export-and-import-json) as the recovery path. |
 | `unsupported_version` | An on-disk artefact carries a version this build does not know. | The store is from a newer version of FastClip. |
-| `import` | The import file's **content** was rejected. `index` is the 0-based position of the offending clip in the `clips` array; `field` names the offending field. Either may be `null` when the fault is at the top level. | What was wrong and where. |
+| `import` | The import file's **content** was rejected. `index` is the 0-based position of the offending clip in the `clips` array; `field` names the offending field and **is not length-bounded** ([below](#field-echoes-a-key-from-the-file-and-has-no-length-bound)). Either may be `null` when the fault is at the top level. | What was wrong and where. |
 | `locked` | Encryption is on and the store is not open, at launch or after [`lock`](#lock). | The PIN prompt, and the frontend discards the clip list, any open form and the search query ([`lock`](#lock)). |
 | `wrong_state` | The command needs the store in a state it is not in. `required` names the needed state, never the observed one. Three are reachable: `unencrypted` from `enable_encryption`, `encrypted` from `unlock`, `lock`, `disable_encryption` and `change_pin`, and `locked` from `unlock` on an already-unlocked store. | The action is not available right now. |
 | `bad_pin` | The PIN was evaluated and did not unwrap the DEK. `attempts_remaining` is `null` where no lockout applies to the entry point; `retry_after_ms` is non-null only on the attempt that exhausts the five. | Wrong PIN, with the attempts remaining, and the wait if one has just started. |
 | `backoff` | An unlock was attempted while a wait was already running. The PIN was **not** evaluated. | How long to wait. |
 | `clipboard` | The clipboard could not be written. `use_count` was not incremented. | The clip could not be copied. |
 | `internal` | An unmodelled failure — a panic, a serialisation fault, a rejection that is not a `ClipError`. | An unexpected error. |
+
+#### `field` echoes a key from the file, and has no length bound
+
+On `unknown_field`, `field` carries a key copied from the import file. **A JSON
+object key has no maximum length**, so a file containing a megabyte-long key
+produces a megabyte-long `field`.
+
+This is recorded because the opposite was assumed once. Nothing in this contract
+may rest on that value being short: not a buffer, not a log line, not a message
+format.
+
+The echo itself stays. [Spec §4.6](../product/spec.md#46-export-and-import-json)
+requires a rejected file to be described "with a message naming what was wrong",
+and a name the backend refused to repeat is not a name. The content is also the
+user's own — a file they chose from their own disk — so echoing it discloses
+nothing they do not have.
+
+**The frontend truncates `field` for display.** That is a rendering rule, not a
+wire rule: the value crosses the seam whole, and the [copy deck](../product/copy.md)
+decides how much of it a message shows. A toast is not a place to render a
+megabyte, and a `field` long enough to be a problem is not one the user will
+recognise anyway.
 
 `internal` exists so the frontend's mapping can be total. **No command may
 return it for a condition modelled above**; one that does is a backend defect,
@@ -1497,6 +1715,18 @@ not define.
 | 18 | Does `lock` emit `update_clips` carrying an empty array, so the frontend clears? | **No. `lock_state` only; the frontend discards its own list on `locked: true`.** | An empty `update_clips`. Rejected: that event is defined as the complete list, so an empty one asserts the store holds no clips. It is indistinguishable from every clip having been deleted, and it is false. |
 | 19 | What does an unrecognised `version` in `settings.json` do? | **Nothing user-visible: the file is ignored, `always_on_top` falls back to `false`, the app starts, and the next write replaces the file at version 1.** [`get_settings`](#get_settings) returns only `storage`. See [versions on disk](#versions-on-disk). | `unsupported_version { component: "settings" }`, which [WP-14](../work/wp-14-settings.md) assumed. Rejected: it needs a fourth `component` value and a fifth error variant on `get_settings`, and it refuses to start FastClip over one boolean — while WP-14's own rule lets a *truncated* settings file start the app. The two cannot both be right, and the lenient one is. |
 
+### Closed after G0b, from a review finding
+
+[Review 012](../reviews/012-wp-08-tray.md) F2 found that
+[spec §4.8](../product/spec.md#48-encryption-and-unlocking) requires the tray's
+*Unlock FastClip* item to raise the window "with the PIN prompt focused", and
+that no mechanism existed by which the webview could learn the item had been
+chosen. That is a defect in this page, not in WP-08's code.
+
+| # | Question | Resolution | Alternative rejected |
+| - | -------- | ---------- | -------------------- |
+| 20 | How does the PIN prompt get focus when the window is raised from outside the webview? | **A third event, [`unlock_requested`](#unlock_requested), emitted by the tray item after the raise.** It carries no payload, the frontend acts on it only while its last `lock_state` says `locked: true`, and it is named for the gesture rather than for the reaction. [ADR-0013](./adr/0013-unlock-requested-event.md). | A frontend-only listener on the webview's own window-focus event. Rejected: it cannot tell the tray's gesture from a user alt-tabbing back to a window they left open, so it must either pull focus on every raise or on none. Also rejected: the backend calling `eval` to focus the element, which puts a DOM selector in Rust and lets a frontend rename break the backend; and naming the event `focus_pin_prompt`, which would become false the moment the item is asked to do anything besides focus. |
+
 ### Identity (closed)
 
 The backend mints every `id`. The frontend never generates one and never sends
@@ -1514,12 +1744,13 @@ one.
 **None.** The six questions this section held at G0b are closed and recorded in
 [§5](#5-closed-questions) as resolutions 7 to 15. Four further questions — three
 opened by the owner's decision to put manual lock in scope, one by
-[WP-14](../work/wp-14-settings.md) — are closed as 16 to 19. Each names the
-alternative rejected.
+[WP-14](../work/wp-14-settings.md) — are closed as 16 to 19, and one raised by
+[review 012](../reviews/012-wp-08-tray.md) as 20. Each names the alternative
+rejected.
 
-Two decisions remain open elsewhere. Neither is a contract question, and no
+Three decisions remain open elsewhere. None is a contract question, and no
 command name, argument, payload field, error variant or event on this page
-depends on either answer:
+depends on any of the answers:
 
 - **Which Rust crate provides SQLite and SQLCipher.** Deferred to
   [ADR-0005](./adr/0005-sqlite-store.md) on the evidence of the
@@ -1531,6 +1762,13 @@ depends on either answer:
   [WP-04](../work/wp-04-frontend-scaffold.md) — not WP-05 — is the first package
   affected, and it proceeds on the provisional single-token list rather than
   waiting.
+- **Whether *Unlock FastClip* dismisses an open settings panel.** The panel is a
+  modal overlay, so while it is open the PIN prompt is covered and `inert` and
+  cannot take focus. What the user meant by clicking an item labelled *Unlock
+  FastClip* is a product question, escalated to the owner as a
+  [spec §4.8](../product/spec.md#48-encryption-and-unlocking) sentence. The
+  [`unlock_requested`](#unlock_requested) event is identical under either answer,
+  which is why it is not a contract question.
 
 ## 7. What `colour` holds today
 

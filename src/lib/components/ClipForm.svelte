@@ -5,7 +5,19 @@
   import { validateLabel, validateValue } from "../validation";
   import { invalidInputMessage, describeError } from "../errorMessage";
   import { DEFAULT_COLOUR } from "../colour";
+  import { overlayDismiss } from "../actions/overlayDismiss";
   import ColourPicker from "./ColourPicker.svelte";
+  import {
+    NEW_CLIP_TITLE,
+    EDIT_CLIP_TITLE,
+    CLIP_LABEL_FIELD_LABEL,
+    CLIP_VALUE_FIELD_LABEL,
+    CLIP_COLOUR_FIELD_LABEL,
+    SAVE_BUTTON_LABEL,
+    CREATE_BUTTON_LABEL,
+    CANCEL_BUTTON_LABEL,
+    UNEXPECTED_ERROR_MESSAGE,
+  } from "../copy";
 
   let {
     clip = null,
@@ -53,26 +65,6 @@
     }
   }
 
-  // Click-outside-to-dismiss must not fire from a text selection dragged out
-  // of the Value textarea and released over the overlay: the DOM's `click`
-  // event lands on the nearest common ancestor of `mousedown` and `mouseup`,
-  // which is the overlay itself in that case, so `event.target ===
-  // event.currentTarget` on `click` alone cannot tell the two apart. Instead
-  // the gesture is only treated as a dismiss when *both* ends — the
-  // `mousedown` and the resulting `click` — land directly on the overlay.
-  let overlayMouseDown = false;
-
-  function handleOverlayMouseDown(event: MouseEvent) {
-    overlayMouseDown = event.target === event.currentTarget;
-  }
-
-  function handleOverlayClick(event: MouseEvent) {
-    if (overlayMouseDown && event.target === event.currentTarget) {
-      oncancel();
-    }
-    overlayMouseDown = false;
-  }
-
   async function handleSubmit(event: SubmitEvent) {
     event.preventDefault();
     submitAttempted = true;
@@ -102,10 +94,13 @@
             formError = invalidInputMessage(err.error.reason);
           }
         } else {
+          // `null` for `locked`: the form is already being closed by
+          // App.svelte's lock effect, so there is nothing left to show it
+          // beside (copy.md "Failures" `locked` row).
           formError = describeError(err.error);
         }
       } else {
-        formError = "An unexpected error occurred.";
+        formError = UNEXPECTED_ERROR_MESSAGE;
       }
     } finally {
       submitting = false;
@@ -117,13 +112,13 @@
   The overlay is a mouse-only "click outside to dismiss" convenience;
   `role="presentation"` says it carries no semantics of its own. Escape
   (handled on the dialog below) and the Cancel button are the keyboard
-  equivalents, so the overlay itself needs no keyboard handler.
+  equivalents, so the overlay itself needs no keyboard handler. See
+  overlayDismiss.ts for the drag-out-of-dialog guard.
 -->
 <div
   role="presentation"
   class="fixed inset-0 z-20 flex items-end justify-center bg-black/50"
-  onmousedown={handleOverlayMouseDown}
-  onclick={handleOverlayClick}
+  use:overlayDismiss={oncancel}
 >
   <div
     role="dialog"
@@ -135,12 +130,12 @@
     onkeydown={handleKeydown}
   >
     <h2 id="clip-form-title" class="mb-3 text-base font-semibold">
-      {isEdit ? "Edit clip" : "New clip"}
+      {isEdit ? EDIT_CLIP_TITLE : NEW_CLIP_TITLE}
     </h2>
 
     <form onsubmit={handleSubmit} novalidate>
       <div class="mb-3">
-        <label for="clip-label" class="mb-1 block text-sm text-zinc-300">Label</label>
+        <label for="clip-label" class="mb-1 block text-sm text-zinc-300">{CLIP_LABEL_FIELD_LABEL}</label>
         <input
           id="clip-label"
           bind:this={labelInput}
@@ -157,7 +152,7 @@
       </div>
 
       <div class="mb-3">
-        <label for="clip-value" class="mb-1 block text-sm text-zinc-300">Value</label>
+        <label for="clip-value" class="mb-1 block text-sm text-zinc-300">{CLIP_VALUE_FIELD_LABEL}</label>
         <textarea
           id="clip-value"
           bind:value
@@ -173,8 +168,8 @@
       </div>
 
       <div class="mb-4">
-        <span class="mb-1 block text-sm text-zinc-300">Colour</span>
-        <ColourPicker selected={colour} onchange={(next) => (colour = next)} />
+        <span class="mb-1 block text-sm text-zinc-300">{CLIP_COLOUR_FIELD_LABEL}</span>
+        <ColourPicker selected={colour} onchange={(next) => (colour = next)} legend={CLIP_COLOUR_FIELD_LABEL} />
       </div>
 
       {#if formError !== null}
@@ -187,14 +182,14 @@
           class="rounded px-3 py-1.5 text-sm text-zinc-300 hover:bg-zinc-700 hover:text-zinc-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400"
           onclick={oncancel}
         >
-          Cancel
+          {CANCEL_BUTTON_LABEL}
         </button>
         <button
           type="submit"
           class="rounded bg-sky-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-sky-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-300 disabled:opacity-60"
           disabled={submitting}
         >
-          {isEdit ? "Save" : "Create"}
+          {isEdit ? SAVE_BUTTON_LABEL : CREATE_BUTTON_LABEL}
         </button>
       </div>
     </form>

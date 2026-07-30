@@ -27,6 +27,8 @@
   - [0010 — Manual lock](./architecture/adr/0010-manual-lock.md)
   - [0011 — Flat backoff](./architecture/adr/0011-flat-backoff.md)
   - [0012 — Logging](./architecture/adr/0012-logging.md)
+  - [0013 — The unlock_requested event](./architecture/adr/0013-unlock-requested-event.md)
+  - [0014 — Tray label truncation](./architecture/adr/0014-tray-label-truncation.md)
 
 # Process
 
@@ -60,8 +62,17 @@
   - [003 — WP-01 Contract ratification](./reviews/003-wp-01-contract.md)
   - [004 — WP-10 Palette and accessibility](./reviews/004-wp-10-palette.md)
   - [005 — WP-05 Clip list, copy, CRUD](./reviews/005-wp-05-crud.md)
+  - [006 — WP-14 Settings and window state](./reviews/006-wp-14-settings.md)
+  - [007 — WP-06 Reordering](./reviews/007-wp-06-reorder.md)
+  - [008 — WP-09 Export and import](./reviews/008-wp-09-export-import.md)
+  - [009 — WP-13 Search and filter](./reviews/009-wp-13-search.md)
+  - [010 — WP-07 Optional PIN-gated encryption](./reviews/010-wp-07-encryption.md)
+  - [011 — WP-11 Copy deck and README](./reviews/011-wp-11-copy-deck.md)
+  - [012 — WP-08 Tray icon](./reviews/012-wp-08-tray.md)
+  - [013 — WP-08 rework: the unlock_requested event](./reviews/013-wp-08-rework.md)
 
 # Reference
 
 - [Inherited debt](./reference/debt.md)
+- [Recurring defect classes](./reference/defect-classes.md)
 - [Glossary](./reference/glossary.md)

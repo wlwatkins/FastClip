@@ -6,7 +6,21 @@
 
 FastClip is a Windows desktop application built with [Tauri](https://tauri.app/) that allows users to create and manage macro buttons for quickly copying predefined text snippets to the clipboard.
 
->**DO NOT USE FOR PASSWORDS!**
+## Security
+
+**By default, clips are stored unencrypted on this computer.** FastClip has an
+optional PIN protection setting that encrypts the store, but it is off until
+you turn it on. If you never open Settings, your clips are plaintext.
+
+Turning PIN protection on does not make FastClip a password manager, and it
+does not protect against another program running under your Windows account —
+that program can read the same files FastClip can. What it does protect is the
+file leaving this machine: cloud sync, backup images, a shared or resold
+computer, a disk without BitLocker.
+
+**If you forget the PIN, your clips cannot be recovered.** There is no reset
+and no backdoor. Export a copy before you turn PIN protection on if you want a
+fallback.
 
 ## Overview
 
@@ -17,7 +31,7 @@ Key benefits of FastClip:
 - Saves time by reducing manual copying and pasting.
 - Simple and intuitive UI for managing macros.
 - Lightweight and fast, powered by Tauri for minimal resource usage.
-- Secure local storage for user-defined macros.
+- Optional PIN protection for the local store — off by default, see [Security](#security).
 - Cross-platform potential with a focus on Windows.
 - With FastClip, you can optimise your workflow and increase productivity effortlessly.
 
@@ -30,6 +44,9 @@ Key benefits of FastClip:
 - Click a button to instantly copy the text to the clipboard
 - Choose the colour of your button
 - Keep window always on top
+- Drag to reorder, and search by label or value
+- Export and import clips as JSON
+- Optional PIN protection, gated by Windows DPAPI as well as the PIN — see [Security](#security)
 
 ## Installation
 
@@ -40,12 +57,12 @@ To install FastClip, download the NSIS executable and follow the installation in
 ![Demonstration](assets/images/demonstration.gif)
 ## Configuration
 
-There are no contributions at the moment. The only setting is whether the app stays on top or not.
-The clipboards are saved unencrypted in appdata, hence why it must not be used for passwords.
+Settings currently cover whether the app stays on top of other windows, and
+PIN protection for the store (see [Security](#security)).
 
 ## Building from Source
 
-The project is built with Tauri and React. The CSS framework used is [Mantine](https://mantine.dev).
+The project is built with Tauri and Svelte.
 
 ### Prerequisites
 
@@ -70,16 +87,11 @@ The project is built with Tauri and React. The CSS framework used is [Mantine](h
 
 ## Todo
 
-- [ ] Add a tray icon with right-click copy functionality.
-- [ ] Encrypt the database.
-- [ ] Switch to SurrealDB.
 - [ ] Improve the UI with better animations.
 - [ ] Add file copy functionality.
 - [ ] Implement keyboard shortcuts for quick macro activation.
 - [ ] Support multiple clipboard entries with history.
 - [ ] Cloud synchronization for macros across devices.
-- [ ] Export and import macros as JSON files.
-- [ ] Fix UI when editing label delete window not updated
 
 
 ## Contributing
